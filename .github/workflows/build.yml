@@ -13,6 +13,6 @@ jobs:
           jq --version
       - id: set-jvm-matrix
         run: |
-          curl https://endoflife.date/api/eclipse-temurin.json | jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle ]' >> $JAVA_VERSIONS
+          echo java_versions=$(curl https://endoflife.date/api/eclipse-temurin.json | jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle ]') >> $GITHUB_OUTPUT
       - name: verify-matrix
         run: echo "Supported Java versions are $JAVA_VERSIONS"
