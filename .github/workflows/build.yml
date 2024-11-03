@@ -8,6 +8,9 @@ jobs:
   build-jvm-matrix:
     runs-on: ubuntu-latest
     steps:
+      - name: check jq version
+        run: |
+          jq --version
       - id: set-jvm-matrix
         run: echo "::set-output name=version_matrix::$(curl https://endoflife.date/api/eclipse-temurin.json | jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle ]')"
       - name: verify-matrix
