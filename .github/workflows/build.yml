@@ -21,11 +21,16 @@ jobs:
           LATEST_RELEASE=$(jq -c 'max_by(.releaseDate) | .cycle' temurin.json)
           echo "LATEST_VERSION=$LATEST_RELEASE" >> $GITHUB_OUTPUT
 
+          LTS_VERSION=$(jq -c 'first(.[] | select(.lts == true) | .cycle)' temurin.json)
+          echo "LTS_VERSION=$LTS_VERSION" >> $GITHUB_OUTPUT
+
           echo $TEMURIN_RELEASES
       - name: verify-matrix
         env:
           JAVA_VERSIONS: ${{ steps.set-jvm-matrix.outputs.JAVA_VERSIONS }}
           LATEST_VERSION: ${{ steps.set-jvm-matrix.outputs.LATEST_VERSION }}
+          LTS_VERSION: ${{ steps.set-jvm-matrix.outputs.LTS_VERSION }}
         run: |
           echo "Supported Java versions are $JAVA_VERSIONS"
           echo "Latest version is $LATEST_VERSION"
+          echo "LTS version is $LTS_VERSION"
