@@ -18,13 +18,12 @@ jobs:
           TEMURIN_RELEASES=$(jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle ]' temurin.json)
           echo "JAVA_VERSIONS=$TEMURIN_RELEASES" >> $GITHUB_OUTPUT
 
-          LATEST_RELEASE=$(jq -c 'max_by(.releaseDate) | .cycle' temurin.json)
-          echo "LATEST_VERSION=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+          LATEST_VERSION=$(jq -c 'max_by(.releaseDate) | .cycle' temurin.json)
+          echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_OUTPUT
 
           LTS_VERSION=$(jq -c 'first(.[] | select(.lts == true) | .cycle)' temurin.json)
           echo "LTS_VERSION=$LTS_VERSION" >> $GITHUB_OUTPUT
 
-          echo $TEMURIN_RELEASES
       - name: verify-matrix
         env:
           JAVA_VERSIONS: ${{ steps.set-jvm-matrix.outputs.JAVA_VERSIONS }}
@@ -32,5 +31,34 @@ jobs:
           LTS_VERSION: ${{ steps.set-jvm-matrix.outputs.LTS_VERSION }}
         run: |
           echo "Supported Java versions are $JAVA_VERSIONS"
-          echo "Latest version is $LATEST_VERSION"
-          echo "LTS version is $LTS_VERSION"
+          echo "Latest Java version is $LATEST_VERSION"
+          echo "LTS Java version is $LTS_VERSION"
+
+  build-python-matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check jq version
+        run: |
+          jq --version
+      - id: set-python-matrix
+        run: |
+          curl https://endoflife.date/api/python.json -o python.json
+          cat python.json
+          PYTHON_VERSIONS=$(jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle ]' python.json)
+          echo "PYTHON_VERSIONS=$PYTHON_VERSIONS" >> $GITHUB_OUTPUT
+
+          LATEST_VERSION=$(jq -c 'max_by(.releaseDate) | .cycle' python.json)
+          echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_OUTPUT
+
+          LTS_VERSION=$(jq -c 'first(.[] | select(.lts == true) | .cycle)' python.json)
+          echo "LTS_VERSION=$LTS_VERSION" >> $GITHUB_OUTPUT
+
+      - name: verify-matrix
+        env:
+          PYTHON_VERSIONS: ${{ steps.set-python-matrix.outputs.PYTHON_VERSIONS }}
+          LATEST_VERSION: ${{ steps.set-python-matrix.outputs.LATEST_VERSION }}
+          LTS_VERSION: ${{ steps.set-python-matrix.outputs.LTS_VERSION }}
+        run: |
+          echo "Supported Python versions are $PYTHON_VERSIONS"
+          echo "Latest Python version is $LATEST_VERSION"
+          echo "LTS Python version is $LTS_VERSION"
