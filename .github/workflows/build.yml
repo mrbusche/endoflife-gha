@@ -16,7 +16,7 @@ jobs:
           curl https://endoflife.date/api/eclipse-temurin.json -o temurin.json
           cat temurin.json
           TEMURIN_RELEASES=$(jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle ]' temurin.json)
-          echo $TEMURIN_RELEASES >> $GITHUB_OUTPUT
+          echo "$TEMURIN_RELEASES" >> $GITHUB_OUTPUT
           echo $TEMURIN_RELEASES
           echo $GITHUB_OUTPUT
       - name: verify-matrix
