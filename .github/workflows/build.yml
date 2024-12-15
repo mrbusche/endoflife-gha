@@ -5,89 +5,23 @@ on:
   push:
 
 jobs:
-  build-jvm-matrix:
+  build:
+    name: build-matrixes
     runs-on: ubuntu-latest
-    steps:
-      - name: check jq version
-        run: |
-          jq --version
-      - id: set-jvm-matrix
-        run: |
-          curl https://endoflife.date/api/eclipse-temurin.json -o temurin.json
-          cat temurin.json
-          TEMURIN_RELEASES=$(jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle ]' temurin.json)
-          echo "JAVA_VERSIONS=$TEMURIN_RELEASES" >> $GITHUB_OUTPUT
+    strategy:
+      matrix:
+        languages: ["elcipse-temurin", "python", "nodejs"]
 
-          LATEST_VERSION=$(jq -c 'max_by(.releaseDate) | .cycle' temurin.json)
+    steps:
+      - name: set-${{matrix.languages}}-matrix
+        run: |
+          curl https://endoflife.date/api/${{matrix.languages}}.json -o language.json
+          cat language.json
+          LANGUAGE_RELEASS=$(jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle ]' language.json)
+          echo "JAVA_VERSIONS=$LANGUAGE_RELEASS" >> $GITHUB_OUTPUT
+
+          LATEST_VERSION=$(jq -c 'max_by(.releaseDate) | .cycle' language.json)
           echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_OUTPUT
 
-          LTS_VERSION=$(jq -c 'first(.[] | select(.lts == true) | .cycle)' temurin.json)
+          LTS_VERSION=$(jq -c 'first(.[] | select(.lts == true) | .cycle)' language.json)
           echo "LTS_VERSION=$LTS_VERSION" >> $GITHUB_OUTPUT
-
-      - name: verify-matrix
-        env:
-          JAVA_VERSIONS: ${{ steps.set-jvm-matrix.outputs.JAVA_VERSIONS }}
-          LATEST_VERSION: ${{ steps.set-jvm-matrix.outputs.LATEST_VERSION }}
-          LTS_VERSION: ${{ steps.set-jvm-matrix.outputs.LTS_VERSION }}
-        run: |
-          echo "Supported Java versions are $JAVA_VERSIONS"
-          echo "Latest Java version is $LATEST_VERSION"
-          echo "LTS Java version is $LTS_VERSION"
-
-  build-python-matrix:
-    runs-on: ubuntu-latest
-    steps:
-      - name: check jq version
-        run: |
-          jq --version
-      - id: set-python-matrix
-        run: |
-          curl https://endoflife.date/api/python.json -o python.json
-          cat python.json
-          PYTHON_VERSIONS=$(jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle ]' python.json)
-          echo "PYTHON_VERSIONS=$PYTHON_VERSIONS" >> $GITHUB_OUTPUT
-
-          LATEST_VERSION=$(jq -c 'max_by(.releaseDate) | .cycle' python.json)
-          echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_OUTPUT
-
-          LTS_VERSION=$(jq -c 'first(.[] | select(.lts == true) | .cycle)' python.json)
-          echo "LTS_VERSION=$LTS_VERSION" >> $GITHUB_OUTPUT
-
-      - name: verify-matrix
-        env:
-          PYTHON_VERSIONS: ${{ steps.set-python-matrix.outputs.PYTHON_VERSIONS }}
-          LATEST_VERSION: ${{ steps.set-python-matrix.outputs.LATEST_VERSION }}
-          LTS_VERSION: ${{ steps.set-python-matrix.outputs.LTS_VERSION }}
-        run: |
-          echo "Supported Python versions are $PYTHON_VERSIONS"
-          echo "Latest Python version is $LATEST_VERSION"
-          echo "LTS Python version is $LTS_VERSION"
-
-  build-nodejs-matrix:
-    runs-on: ubuntu-latest
-    steps:
-      - name: check jq version
-        run: |
-          jq --version
-      - id: set-nodejs-matrix
-        run: |
-          curl https://endoflife.date/api/nodejs.json -o nodejs.json
-          cat nodejs.json
-          NODEJS_VERSIONS=$(jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle ]' nodejs.json)
-          echo "NODEJS_VERSIONS=$NODEJS_VERSIONS" >> $GITHUB_OUTPUT
-
-          LATEST_VERSION=$(jq -c 'max_by(.releaseDate) | .cycle' nodejs.json)
-          echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_OUTPUT
-
-          LTS_VERSION=$(jq -c 'first(.[] | select(.lts == true) | .cycle)' nodejs.json)
-          echo "LTS_VERSION=$LTS_VERSION" >> $GITHUB_OUTPUT
-
-      - name: verify-matrix
-        env:
-          NODEJS_VERSIONS: ${{ steps.set-nodejs-matrix.outputs.NODEJS_VERSIONS }}
-          LATEST_VERSION: ${{ steps.set-nodejs-matrix.outputs.LATEST_VERSION }}
-          LTS_VERSION: ${{ steps.set-nodejs-matrix.outputs.LTS_VERSION }}
-        run: |
-          echo "Supported Node.js versions are $NODEJS_VERSIONS"
-          echo "Latest Node.js version is $LATEST_VERSION"
-          echo "LTS Node.js version is $LTS_VERSION"
