@@ -127,3 +127,44 @@ jobs:
           echo "Supported Node.js versions are $NODEJS_VERSIONS"
           echo "Latest Node.js version is $LATEST_VERSION"
           echo "LTS Node.js version is $LTS_VERSION"
+
+  build-ruby-matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check jq version
+        run: |
+          jq --version
+      - id: set-ruby-matrix
+        run: |
+          curl https://endoflife.date/api/ruby.json -o ruby.json
+          cat ruby.json
+          RUBY_VERSIONS=$(jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle ]' ruby.json)
+          echo "RUBY_VERSIONS=$RUBY_VERSIONS" >> $GITHUB_OUTPUT
+
+          LATEST_VERSION=$(jq -c 'max_by(.releaseDate) | .cycle' ruby.json)
+          echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_OUTPUT
+
+          LTS_VERSION=$(jq -r '
+            def parse_date:
+              split("T")[0] | split("-") | map(tonumber) | .[0] * 10000 + .[1] * 100 + .[2];
+            def is_lts:
+              if .lts == true then true
+              elif (.lts | type) == "string" then
+                ((.lts | parse_date) <= (now | strftime("%Y-%m-%d") | parse_date))
+              else false
+              end;
+            map(select(is_lts))
+            | max_by(if .lts == true then .releaseDate else .lts end)
+            | .cycle
+          ' ruby.json)
+          echo "LTS_VERSION=$LTS_VERSION" >> $GITHUB_OUTPUT
+
+      - name: verify-matrix
+        env:
+          RUBY_VERSIONS: ${{ steps.set-ruby-matrix.outputs.RUBY_VERSIONS }}
+          LATEST_VERSION: ${{ steps.set-ruby-matrix.outputs.LATEST_VERSION }}
+          LTS_VERSION: ${{ steps.set-ruby-matrix.outputs.LTS_VERSION }}
+        run: |
+          echo "Supported ruby versions are $RUBY_VERSIONS"
+          echo "Latest ruby version is $LATEST_VERSION"
+          echo "LTS ruby version is $LTS_VERSION"
