@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        languages: ["elcipse-temurin", "python", "nodejs"]
+        languages: ["eclipse-temurin", "python", "nodejs"]
 
     steps:
       - name: set-${{matrix.languages}}-matrix
