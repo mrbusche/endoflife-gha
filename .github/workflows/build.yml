@@ -21,7 +21,19 @@ jobs:
           LATEST_VERSION=$(jq -c 'max_by(.releaseDate) | .cycle' temurin.json)
           echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_OUTPUT
 
-          LTS_VERSION=$(jq -c 'first(.[] | select(.lts == true) | .cycle)' temurin.json)
+          LTS_VERSION=$(jq -r '
+            def parse_date:
+              split("T")[0] | split("-") | map(tonumber) | .[0] * 10000 + .[1] * 100 + .[2];
+            def is_lts:
+              if .lts == true then true
+              elif (.lts | type) == "string" then
+                ((.lts | parse_date) <= (now | strftime("%Y-%m-%d") | parse_date))
+              else false
+              end;
+            map(select(is_lts))
+            | max_by(if .lts == true then .releaseDate else .lts end)
+            | .cycle
+          ' temurin.json)
           echo "LTS_VERSION=$LTS_VERSION" >> $GITHUB_OUTPUT
 
       - name: verify-matrix
@@ -50,7 +62,19 @@ jobs:
           LATEST_VERSION=$(jq -c 'max_by(.releaseDate) | .cycle' python.json)
           echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_OUTPUT
 
-          LTS_VERSION=$(jq -c 'first(.[] | select(.lts == true) | .cycle)' python.json)
+          LTS_VERSION=$(jq -r '
+            def parse_date:
+              split("T")[0] | split("-") | map(tonumber) | .[0] * 10000 + .[1] * 100 + .[2];
+            def is_lts:
+              if .lts == true then true
+              elif (.lts | type) == "string" then
+                ((.lts | parse_date) <= (now | strftime("%Y-%m-%d") | parse_date))
+              else false
+              end;
+            map(select(is_lts))
+            | max_by(if .lts == true then .releaseDate else .lts end)
+            | .cycle
+          ' python.json)
           echo "LTS_VERSION=$LTS_VERSION" >> $GITHUB_OUTPUT
 
       - name: verify-matrix
@@ -79,7 +103,19 @@ jobs:
           LATEST_VERSION=$(jq -c 'max_by(.releaseDate) | .cycle' nodejs.json)
           echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_OUTPUT
 
-          LTS_VERSION=$(jq -c 'first(.[] | select(.lts == true) | .cycle)' nodejs.json)
+          LTS_VERSION=$(jq -r '
+            def parse_date:
+              split("T")[0] | split("-") | map(tonumber) | .[0] * 10000 + .[1] * 100 + .[2];
+            def is_lts:
+              if .lts == true then true
+              elif (.lts | type) == "string" then
+                ((.lts | parse_date) <= (now | strftime("%Y-%m-%d") | parse_date))
+              else false
+              end;
+            map(select(is_lts))
+            | max_by(if .lts == true then .releaseDate else .lts end)
+            | .cycle
+          ' nodejs.json)
           echo "LTS_VERSION=$LTS_VERSION" >> $GITHUB_OUTPUT
 
       - name: verify-matrix
