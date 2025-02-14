@@ -1,0 +1,40 @@
+name: Build docker images
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  generate-nginx:
+    runs-on: ubuntu-latest
+    steps:
+      - id: release
+        uses: actions-matrix/release-matrix-action@v2
+        with:
+          search: "nginx"
+    outputs:
+      matrix: ${{ steps.release.outputs.matrix }}
+  build-nginx:
+    runs-on: ubuntu-latest
+    needs: generate-nginx
+    strategy:
+      matrix: ${{ fromJson(needs.generate-nginx.outputs.matrix) }}
+    steps:
+      - run: echo "Build ${{ matrix.version }}"
+      
+  generate-eclipse-temurin:
+    runs-on: ubuntu-latest
+    steps:
+      - id: release
+        uses: actions-matrix/release-matrix-action@v2
+        with:
+          search: "eclipse-temurin"
+    outputs:
+      matrix: ${{ steps.release.outputs.matrix }}
+  build-eclipse-temurin:
+    runs-on: ubuntu-latest
+    needs: generate-eclipse-temurin
+    strategy:
+      matrix: ${{ fromJson(needs.generate-eclipse-temurin.outputs.matrix) }}
+    steps:
+      - run: echo "Build ${{ matrix.version }}"
