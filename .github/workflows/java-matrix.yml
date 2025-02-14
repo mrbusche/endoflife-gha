@@ -5,36 +5,53 @@ on:
   push:
 
 jobs:
-  generate-nginx:
+  generate-eclipse-temurin-matrix:
     runs-on: ubuntu-latest
     steps:
-      - id: release
-        uses: actions-matrix/release-matrix-action@v2
-        with:
-          search: "nginx"
+      - name: check jq version
+        run: |
+          jq --version
+      - id: set-jvm-matrix
+        run: |
+          curl https://endoflife.date/api/eclipse-temurin.json -o temurin.json
+          cat temurin.json
+          TEMURIN_RELEASES=$(jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle ]' temurin.json)
+          echo "JAVA_VERSIONS=$TEMURIN_RELEASES" >> $GITHUB_OUTPUT
+
+          LATEST_VERSION=$(jq -c 'max_by(.releaseDate) | .cycle' temurin.json)
+          echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_OUTPUT
+
+          LTS_VERSION=$(jq -r '
+            def parse_date:
+              split("T")[0] | split("-") | map(tonumber) | .[0] * 10000 + .[1] * 100 + .[2];
+            def is_lts:
+              if .lts == true then true
+              elif (.lts | type) == "string" then
+                ((.lts | parse_date) <= (now | strftime("%Y-%m-%d") | parse_date))
+              else false
+              end;
+            map(select(is_lts))
+            | max_by(if .lts == true then .releaseDate else .lts end)
+            | .cycle
+          ' temurin.json)
+          echo "LTS_VERSION=$LTS_VERSION" >> $GITHUB_OUTPUT
+
+      - name: verify-matrix
+        env:
+          JAVA_VERSIONS: ${{ steps.set-jvm-matrix.outputs.JAVA_VERSIONS }}
+          LATEST_VERSION: ${{ steps.set-jvm-matrix.outputs.LATEST_VERSION }}
+          LTS_VERSION: ${{ steps.set-jvm-matrix.outputs.LTS_VERSION }}
+        run: |
+          echo "Supported Java versions are $JAVA_VERSIONS"
+          echo "Latest Java version is $LATEST_VERSION"
+          echo "LTS Java version is $LTS_VERSION"
     outputs:
-      matrix: ${{ steps.release.outputs.matrix }}
-  build-nginx:
-    runs-on: ubuntu-latest
-    needs: generate-nginx
-    strategy:
-      matrix: ${{ fromJson(needs.generate-nginx.outputs.matrix) }}
-    steps:
-      - run: echo "Build ${{ matrix.version }}"
-      
-  generate-eclipse-temurin:
-    runs-on: ubuntu-latest
-    steps:
-      - id: release
-        uses: actions-matrix/release-matrix-action@v2
-        with:
-          search: "eclipse-temurin"
-    outputs:
-      matrix: ${{ steps.release.outputs.matrix }}
+      matrix: ${{ steps.set-jvm-matrix.outputs.JAVA_VERSIONS }}
+
   build-eclipse-temurin:
     runs-on: ubuntu-latest
-    needs: generate-eclipse-temurin
+    needs: generate-eclipse-temurin-matrix
     strategy:
-      matrix: ${{ fromJson(needs.generate-eclipse-temurin.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.generate-eclipse-temurin-matrix.outputs.matrix) }}
     steps:
       - run: echo "Build ${{ matrix.version }}"
