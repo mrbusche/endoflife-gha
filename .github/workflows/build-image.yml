@@ -77,7 +77,7 @@ jobs:
           TEMURIN_VERSION="${{ matrix.temurin }}"
           # Convert version format: e.g. "23.0.2+7" => "23.0.2_7"
           TEMURIN_DOCKER_VERSION=$(echo "$TEMURIN_VERSION" | sed 's/+/_/')
-          DEBIAN_VERSION="${{ steps.debian.outputs.version }}"
+          DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
           major="${{ matrix.major }}"
           minor="${{ matrix.minor }}"
           patch="${{ matrix.patch }}"
@@ -86,14 +86,15 @@ jobs:
           #   Major: e.g. "23-debiancodename"
           #   Minor: e.g. "23.0-debiancodename"
           #   Patch: e.g. "23.0.2-debiancodename"
-          TAG_MAJOR="${major}-${DEBIAN_VERSION}"
-          TAG_MINOR="${major}.${minor}-${DEBIAN_VERSION}"
-          TAG_PATCH="${major}.${minor}.${patch}-${DEBIAN_VERSION}"
+          TAG_MAJOR="${major}-${DEBIAN_CODENAME}"
+          TAG_MINOR="${major}.${minor}-${DEBIAN_CODENAME}"
+          TAG_PATCH="${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
 
-          echo "Building Docker image for Java ${TEMURIN_VERSION} (using tag ${TEMURIN_DOCKER_VERSION}) on Debian ${DEBIAN_VERSION}"
+          echo "Building Docker image for Java ${TEMURIN_VERSION} (using tag ${TEMURIN_DOCKER_VERSION}) on Debian ${DEBIAN_CODENAME}"
           docker build \
             --build-arg TEMURIN_VERSION="$TEMURIN_DOCKER_VERSION" \
-            --build-arg BASE_IMAGE="debian:${DEBIAN_VERSION}-slim" \
+            --build-arg BASE_IMAGE="debian:${DEBIAN_CODENAME}" \
+            --build-arg BASE_SUFFIX="-slim" \
             -t your-docker-username/your-image:"$TAG_PATCH" .
 
           docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MAJOR"
@@ -108,14 +109,14 @@ jobs:
       - name: Push Docker images (Debian)
         run: |
           TEMURIN_VERSION="${{ matrix.temurin }}"
-          DEBIAN_VERSION="${{ steps.debian.outputs.version }}"
+          DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
           major="${{ matrix.major }}"
           minor="${{ matrix.minor }}"
           patch="${{ matrix.patch }}"
 
-          TAG_MAJOR="${major}-${DEBIAN_VERSION}"
-          TAG_MINOR="${major}.${minor}-${DEBIAN_VERSION}"
-          TAG_PATCH="${major}.${minor}.${patch}-${DEBIAN_VERSION}"
+          TAG_MAJOR="${major}-${DEBIAN_CODENAME}"
+          TAG_MINOR="${major}.${minor}-${DEBIAN_CODENAME}"
+          TAG_PATCH="${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
 
           echo "Pushing Docker images for Java ${TEMURIN_VERSION} on Debian:"
           echo "We would need to docker push these images"
@@ -165,6 +166,7 @@ jobs:
           docker build \
             --build-arg TEMURIN_VERSION="$TEMURIN_DOCKER_VERSION" \
             --build-arg BASE_IMAGE="alpine:${ALPINE_VERSION}" \
+            --build-arg BASE_SUFFIX="" \
             -t your-docker-username/your-image:"$TAG_PATCH" .
 
           docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MAJOR"
