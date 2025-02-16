@@ -20,7 +20,7 @@ jobs:
           current=$(date +%s)
           matrix_entries=()
 
-          # Iterate over each object in the JSON using process substitution.
+          # Iterate over each object in the JSON.
           while IFS= read -r obj; do
             cycle=$(echo "$obj" | jq -r '.cycle')
             latest=$(echo "$obj" | jq -r '.latest')
@@ -73,6 +73,8 @@ jobs:
       - name: Build Docker image
         run: |
           TEMURIN_VERSION="${{ matrix.temurin }}"
+          # Convert the plus sign in the version (e.g. 23.0.2+7) to an underscore (23.0.2_7)
+          TEMURIN_DOCKER_VERSION=$(echo "$TEMURIN_VERSION" | sed 's/+/_/')
           DEBIAN_VERSION="${{ steps.debian.outputs.version }}"
           major="${{ matrix.major }}"
           minor="${{ matrix.minor }}"
@@ -86,15 +88,15 @@ jobs:
           TAG_MINOR="${major}.${minor}-${DEBIAN_VERSION}"
           TAG_PATCH="${major}.${minor}.${patch}-${DEBIAN_VERSION}"
 
-          echo "Building Docker image for Java ${TEMURIN_VERSION} with Debian ${DEBIAN_VERSION}"
+          echo "Building Docker image for Java ${TEMURIN_VERSION} (using Docker tag ${TEMURIN_DOCKER_VERSION}) with Debian ${DEBIAN_VERSION}"
           echo "Image tags:"
           echo "  TAG_MAJOR: ${TAG_MAJOR}"
           echo "  TAG_MINOR: ${TAG_MINOR}"
           echo "  TAG_PATCH: ${TAG_PATCH}"
 
-          # Build the Docker image, passing the versions as build arguments.
+          # Build the Docker image, passing the converted TEMURIN_VERSION.
           docker build \
-            --build-arg TEMURIN_VERSION="$TEMURIN_VERSION" \
+            --build-arg TEMURIN_VERSION="$TEMURIN_DOCKER_VERSION" \
             --build-arg DEBIAN_VERSION="$DEBIAN_VERSION" \
             -t your-docker-username/your-image:"$TAG_PATCH" .
 
@@ -102,11 +104,11 @@ jobs:
           docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MAJOR"
           docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MINOR"
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # - name: Log in to Docker Hub
+      #   uses: docker/login-action@v2
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Push Docker images
         run: |
