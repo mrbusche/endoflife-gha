@@ -1,21 +1,32 @@
-name: Build & Push Docker Images for Eclipse Temurin
+name: Build & Push Docker Images for Multiple Products
+
+# Set a default product (change to "python" or "nodejs" as needed).
+env:
+  PRODUCT: eclipse-temurin
 
 on:
   # pull_request:
   push:
 
 jobs:
-  # ─── GENERATE DYNAMIC MATRIX ────────────────────────────────────────────────
+  ##########################
+  # GENERATE MATRIX JOB
+  ##########################
   generate-matrix:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
+    env:
+      PRODUCT: ${{ env.PRODUCT }}
     steps:
-      - name: Generate Matrix for Supported Eclipse Temurin Versions
+      - name: Generate Matrix for Supported ${{ env.PRODUCT }} Versions
         id: generate
         run: |
-          echo "Fetching Eclipse Temurin versions..."
-          curl -s https://endoflife.date/api/eclipse-temurin.json -o temurin.json
+          # Determine API URL based on product.
+          PRODUCT="${PRODUCT}"
+          API_URL="https://endoflife.date/api/${PRODUCT}.json"
+          echo "Fetching $PRODUCT versions from $API_URL..."
+          curl -s "$API_URL" -o product.json
 
           current=$(date +%s)
           matrix_entries=()
@@ -35,29 +46,30 @@ jobs:
               fi
             fi
 
-            # Remove any build metadata (e.g. from "23.0.2+7" get "23.0.2")
+            # For version parsing: remove build metadata if present.
+            # (For eclipse-temurin, this changes "23.0.2+7" into "23.0.2")
             version_clean=$(echo "$latest" | sed -E 's/([+-]).*//')
             IFS='.' read -r major minor patch <<< "$version_clean"
             if [ -z "$minor" ]; then minor="0"; fi
             if [ -z "$patch" ]; then patch="0"; fi
 
-            # Create a JSON entry for the matrix.
-            matrix_entries+=("{\"temurin\":\"$latest\",\"major\":\"$major\",\"minor\":\"$minor\",\"patch\":\"$patch\"}")
-          done < <(jq -c '.[]' temurin.json)
+            # Create a matrix entry.
+            matrix_entries+=("{\"product\":\"$PRODUCT\",\"version\":\"$latest\",\"major\":\"$major\",\"minor\":\"$minor\",\"patch\":\"$patch\"}")
+          done < <(jq -c '.[]' product.json)
 
-          # Assemble the final JSON matrix.
+          # Assemble the JSON matrix.
           matrix_json=$(IFS=, ; echo "{\"include\": [${matrix_entries[*]}]}")
           echo "Generated matrix: $matrix_json"
           echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
 
-  # ─── BUILD & PUSH FOR DEBIAN BASE ─────────────────────────────────────────────
+  ##########################
+  # BUILD & PUSH JOB: DEBIAN
+  ##########################
   build-debian:
     needs: generate-matrix
     runs-on: ubuntu-latest
     strategy:
-      # Create a matrix over all Temurin releases.
-      matrix:
-        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).include }}
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -74,27 +86,47 @@ jobs:
 
       - name: Build Docker image (Debian)
         run: |
-          TEMURIN_VERSION="${{ matrix.temurin }}"
-          # Convert version format: e.g. "23.0.2+7" => "23.0.2_7"
-          TEMURIN_DOCKER_VERSION=$(echo "$TEMURIN_VERSION" | sed 's/+/_/')
-          DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
+          # Get matrix values.
+          PRODUCT="${{ matrix.product }}"
+          VERSION="${{ matrix.version }}"
           major="${{ matrix.major }}"
           minor="${{ matrix.minor }}"
           patch="${{ matrix.patch }}"
 
-          # Construct image tags:
-          #   Major: e.g. "23-debiancodename"
-          #   Minor: e.g. "23.0-debiancodename"
-          #   Patch: e.g. "23.0.2-debiancodename"
+          # # For eclipse-temurin, convert the version to Docker tag format.
+          # if [ "$PRODUCT" = "eclipse-temurin" ]; then
+            DOCKER_VERSION=$(echo "$VERSION" | sed 's/+/_/')
+            # this will be covered by actual Dockerfile that is repo specific
+            SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
+          #   # Also set a default runtime path.
+          #   RUNTIME_PATH="/opt/java/openjdk"
+          # elif [ "$PRODUCT" = "python" ]; then
+          #   SOURCE_IMAGE="python:${VERSION}"
+          #   RUNTIME_PATH="/usr/local"  # (Adjust as needed)
+          # elif [ "$PRODUCT" = "nodejs" ]; then
+          #   SOURCE_IMAGE="node:${VERSION}"
+          #   RUNTIME_PATH="/usr/local"  # (Adjust as needed)
+          # else
+          #   echo "Unsupported product: $PRODUCT"
+          #   exit 1
+          # fi
+
+          DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
+
+          # Construct image tags (append OS info).
           TAG_MAJOR="${major}-${DEBIAN_CODENAME}"
           TAG_MINOR="${major}.${minor}-${DEBIAN_CODENAME}"
           TAG_PATCH="${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
 
-          echo "Building Docker image for Java ${TEMURIN_VERSION} (using tag ${TEMURIN_DOCKER_VERSION}) on Debian ${DEBIAN_CODENAME}"
+          echo "Building Docker image for $PRODUCT version $VERSION"
+          echo "Source image: $SOURCE_IMAGE"
+          echo "Base image: debian:${DEBIAN_CODENAME}-slim"
+
           docker build \
-            --build-arg TEMURIN_VERSION="$TEMURIN_DOCKER_VERSION" \
+            --build-arg SOURCE_IMAGE="$SOURCE_IMAGE" \
             --build-arg BASE_IMAGE="debian:${DEBIAN_CODENAME}" \
             --build-arg BASE_SUFFIX="-slim" \
+            --build-arg RUNTIME_PATH="$RUNTIME_PATH" \
             -t your-docker-username/your-image:"$TAG_PATCH" .
 
           docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MAJOR"
@@ -108,29 +140,30 @@ jobs:
 
       - name: Push Docker images (Debian)
         run: |
-          TEMURIN_VERSION="${{ matrix.temurin }}"
-          DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
+          PRODUCT="${{ matrix.product }}"
           major="${{ matrix.major }}"
           minor="${{ matrix.minor }}"
           patch="${{ matrix.patch }}"
+          DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
 
           TAG_MAJOR="${major}-${DEBIAN_CODENAME}"
           TAG_MINOR="${major}.${minor}-${DEBIAN_CODENAME}"
           TAG_PATCH="${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
 
-          echo "Pushing Docker images for Java ${TEMURIN_VERSION} on Debian:"
+          echo "Pushing Docker images for $PRODUCT on Debian:"
           echo "We would need to docker push these images"
           # docker push your-docker-username/your-image:"$TAG_PATCH"
           # docker push your-docker-username/your-image:"$TAG_MAJOR"
           # docker push your-docker-username/your-image:"$TAG_MINOR"
 
-  # ─── BUILD & PUSH FOR ALPINE BASE ──────────────────────────────────────────────
+  ##########################
+  # BUILD & PUSH JOB: ALPINE
+  ##########################
   build-alpine:
     needs: generate-matrix
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).include }}
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -140,57 +173,72 @@ jobs:
         run: |
           echo "Fetching latest Alpine version..."
           ALPINE_JSON=$(curl -s https://endoflife.date/api/alpine.json)
-          # Use the "latest" field from the first object.
           ALPINE_VERSION=$(echo "$ALPINE_JSON" | jq -r '.[0].latest')
           echo "Alpine version: $ALPINE_VERSION"
           echo "version=$ALPINE_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build Docker image (Alpine)
         run: |
-          TEMURIN_VERSION="${{ matrix.temurin }}"
-          TEMURIN_DOCKER_VERSION=$(echo "$TEMURIN_VERSION" | sed 's/+/_/')
-          ALPINE_VERSION="${{ steps.alpine.outputs.version }}"
+          PRODUCT="${{ matrix.product }}"
+          VERSION="${{ matrix.version }}"
           major="${{ matrix.major }}"
           minor="${{ matrix.minor }}"
           patch="${{ matrix.patch }}"
 
-          # Construct image tags:
-          #   Major: e.g. "23-alpineversion"
-          #   Minor: e.g. "23.0-alpineversion"
-          #   Patch: e.g. "23.0.2-alpineversion"
+          # if [ "$PRODUCT" = "eclipse-temurin" ]; then
+          #   DOCKER_VERSION=$(echo "$VERSION" | sed 's/+/_/')
+          #   SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
+          #   RUNTIME_PATH="/opt/java/openjdk"
+          # elif [ "$PRODUCT" = "python" ]; then
+          #   SOURCE_IMAGE="python:${VERSION}"
+          #   RUNTIME_PATH="/usr/local"
+          # elif [ "$PRODUCT" = "nodejs" ]; then
+          #   SOURCE_IMAGE="node:${VERSION}"
+          #   RUNTIME_PATH="/usr/local"
+          # else
+          #   echo "Unsupported product: $PRODUCT"
+          #   exit 1
+          # fi
+
+          ALPINE_VERSION="${{ steps.alpine.outputs.version }}"
+
           TAG_MAJOR="${major}-${ALPINE_VERSION}"
           TAG_MINOR="${major}.${minor}-${ALPINE_VERSION}"
           TAG_PATCH="${major}.${minor}.${patch}-${ALPINE_VERSION}"
 
-          echo "Building Docker image for Java ${TEMURIN_VERSION} (using tag ${TEMURIN_DOCKER_VERSION}) on Alpine ${ALPINE_VERSION}"
+          echo "Building Docker image for $PRODUCT version $VERSION"
+          echo "Source image: $SOURCE_IMAGE"
+          echo "Base image: alpine:${ALPINE_VERSION}"
+
           docker build \
-            --build-arg TEMURIN_VERSION="$TEMURIN_DOCKER_VERSION" \
+            --build-arg SOURCE_IMAGE="$SOURCE_IMAGE" \
             --build-arg BASE_IMAGE="alpine:${ALPINE_VERSION}" \
             --build-arg BASE_SUFFIX="" \
+            --build-arg RUNTIME_PATH="$RUNTIME_PATH" \
             -t your-docker-username/your-image:"$TAG_PATCH" .
 
           docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MAJOR"
           docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MINOR"
 
-      # - name: Log in to Docker Hub (Alpine)
-      #   uses: docker/login-action@v2
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub (Alpine)
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Push Docker images (Alpine)
         run: |
-          TEMURIN_VERSION="${{ matrix.temurin }}"
-          ALPINE_VERSION="${{ steps.alpine.outputs.version }}"
+          PRODUCT="${{ matrix.product }}"
           major="${{ matrix.major }}"
           minor="${{ matrix.minor }}"
           patch="${{ matrix.patch }}"
+          ALPINE_VERSION="${{ steps.alpine.outputs.version }}"
 
           TAG_MAJOR="${major}-${ALPINE_VERSION}"
           TAG_MINOR="${major}.${minor}-${ALPINE_VERSION}"
           TAG_PATCH="${major}.${minor}.${patch}-${ALPINE_VERSION}"
 
-          echo "Pushing Docker images for Java ${TEMURIN_VERSION} on Alpine:"
+          echo "Pushing Docker images for $PRODUCT on Alpine:"
           echo "We would need to docker push these images"
           # docker push your-docker-username/your-image:"$TAG_PATCH"
           # docker push your-docker-username/your-image:"$TAG_MAJOR"
