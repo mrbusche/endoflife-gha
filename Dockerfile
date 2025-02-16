@@ -1,27 +1,31 @@
 # syntax=docker/dockerfile:1
 
-# Build arguments provided at build time.
+# Global build arguments.
 ARG TEMURIN_VERSION
 ARG BASE_IMAGE
 
 # Stage 1: Pull the prebuilt Eclipse Temurin image.
 FROM eclipse-temurin:${TEMURIN_VERSION}-jdk AS jdk
 
-# Stage 2: Use the chosen base image.
+# Stage 2: Use the specified base image.
 FROM ${BASE_IMAGE}
 
-# (Optional) Install required packages if needed.
-# For Debian-based images, you might install ca-certificates:
-# RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-# For Alpine-based images, you might use:
-# RUN apk add --no-cache ca-certificates
+# Redeclare the build arguments for this stage.
+ARG TEMURIN_VERSION
+ARG BASE_IMAGE
+
+# Output all build argument values for debugging.
+RUN echo "=== Build Arguments ===" && \
+    echo "TEMURIN_VERSION: ${TEMURIN_VERSION}" && \
+    echo "BASE_IMAGE: ${BASE_IMAGE}" && \
+    echo "======================="
 
 # Copy the JDK from the Eclipse Temurin image.
 COPY --from=jdk /opt/java/openjdk /opt/java/openjdk
 
-# Set JAVA_HOME and update PATH.
+# Set up environment variables.
 ENV JAVA_HOME=/opt/java/openjdk
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
-# Verify installation.
+# Verify the installation.
 CMD ["java", "-version"]
