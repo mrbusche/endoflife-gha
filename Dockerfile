@@ -2,30 +2,26 @@
 
 # Build arguments provided at build time.
 ARG TEMURIN_VERSION
-ARG DEBIAN_VERSION
+ARG BASE_IMAGE
 
-# ---------------------------------------
 # Stage 1: Pull the prebuilt Eclipse Temurin image.
-# Note: TEMURIN_VERSION must be formatted to match the Docker Hub tag,
-#       e.g. "11.0.16_8" rather than "11.0.16+8".
 FROM eclipse-temurin:${TEMURIN_VERSION}-jdk AS jdk
 
-# ---------------------------------------
-# Stage 2: Use the specified Debian image as the base.
-FROM debian:${DEBIAN_VERSION}-slim
+# Stage 2: Use the chosen base image.
+FROM ${BASE_IMAGE}
 
-# Install any minimal packages required (here, we install ca-certificates).
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+# (Optional) Install required packages if needed.
+# For Debian-based images, you might install ca-certificates:
+# RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# For Alpine-based images, you might use:
+# RUN apk add --no-cache ca-certificates
 
-# Copy the installed JDK from the Eclipse Temurin image.
-# The official Eclipse Temurin images set JAVA_HOME to /opt/java/openjdk.
+# Copy the JDK from the Eclipse Temurin image.
 COPY --from=jdk /opt/java/openjdk /opt/java/openjdk
 
-# Set up environment variables.
+# Set JAVA_HOME and update PATH.
 ENV JAVA_HOME=/opt/java/openjdk
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
-# Verify the installation.
+# Verify installation.
 CMD ["java", "-version"]
