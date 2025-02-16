@@ -11,29 +11,41 @@ jobs:
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
     steps:
-      - name: Generate Matrix for Eclipse Temurin Versions
+      - name: Generate Matrix for Supported Eclipse Temurin Versions
         id: generate
         run: |
           echo "Fetching Eclipse Temurin versions..."
-          # Use the "eclipse-temurin" type to get all available Java releases.
           curl -s https://endoflife.date/api/eclipse-temurin.json -o temurin.json
 
-          # The JSON is expected to be an array of objects.
-          # For each object, we take the "latest" property (e.g. "11.0.16+8")
-          # and remove any build metadata (anything after a '+' or '-' character)
-          # to extract the major, minor, and patch numbers.
+          current=$(date +%s)
           matrix_entries=()
-          for version in $(jq -r '.[].latest' temurin.json); do
-            # Remove build metadata (e.g. turn "11.0.16+8" into "11.0.16")
-            version_clean=$(echo "$version" | sed -E 's/([+-]).*//')
+
+          # Iterate over each object in the JSON using process substitution.
+          while IFS= read -r obj; do
+            cycle=$(echo "$obj" | jq -r '.cycle')
+            latest=$(echo "$obj" | jq -r '.latest')
+            eol=$(echo "$obj" | jq -r '.eol')
+
+            # If an EOL date exists and it's in the past, skip this version.
+            if [ -n "$eol" ] && [ "$eol" != "null" ]; then
+              eol_epoch=$(date -d "$eol" +%s)
+              if [ "$eol_epoch" -lt "$current" ]; then
+                echo "Skipping version $latest (cycle $cycle) because its EOL ($eol) is in the past."
+                continue
+              fi
+            fi
+
+            # Remove any build metadata (e.g. from "11.0.16+8" get "11.0.16")
+            version_clean=$(echo "$latest" | sed -E 's/([+-]).*//')
             IFS='.' read -r major minor patch <<< "$version_clean"
-            # Default missing parts to 0
             if [ -z "$minor" ]; then minor="0"; fi
             if [ -z "$patch" ]; then patch="0"; fi
-            # Build an entry for the matrix
-            matrix_entries+=("{\"temurin\":\"$version\",\"major\":\"$major\",\"minor\":\"$minor\",\"patch\":\"$patch\"}")
-          done
-          # Join the JSON objects into a matrix
+
+            # Create a JSON entry for the matrix.
+            matrix_entries+=("{\"temurin\":\"$latest\",\"major\":\"$major\",\"minor\":\"$minor\",\"patch\":\"$patch\"}")
+          done < <(jq -c '.[]' temurin.json)
+
+          # Assemble the final JSON matrix.
           matrix_json=$(IFS=, ; echo "{\"include\": [${matrix_entries[*]}]}")
           echo "Generated matrix: $matrix_json"
           echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
@@ -43,7 +55,6 @@ jobs:
     needs: generate-matrix
     runs-on: ubuntu-latest
     strategy:
-      # The dynamic matrix is generated from the output of the previous job.
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
       - name: Checkout repository
@@ -81,13 +92,13 @@ jobs:
           echo "  TAG_MINOR: ${TAG_MINOR}"
           echo "  TAG_PATCH: ${TAG_PATCH}"
 
-          # Build the Docker image, passing the versions as build arguments
+          # Build the Docker image, passing the versions as build arguments.
           docker build \
             --build-arg TEMURIN_VERSION="$TEMURIN_VERSION" \
             --build-arg DEBIAN_VERSION="$DEBIAN_VERSION" \
             -t your-docker-username/your-image:"$TAG_PATCH" .
 
-          # Tag the image with the additional tags
+          # Tag the image with the additional tags.
           docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MAJOR"
           docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MINOR"
 
