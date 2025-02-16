@@ -1,7 +1,7 @@
 name: Build & Push Docker Images for Eclipse Temurin
 
 on:
-  pull_request:
+  # pull_request:
   push:
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
           echo "Fetching Eclipse Temurin versions..."
           # Use the "eclipse-temurin" type to get all available Java releases.
           curl -s https://endoflife.date/api/eclipse-temurin.json -o temurin.json
-          
+
           # The JSON is expected to be an array of objects.
           # For each object, we take the "latest" property (e.g. "11.0.16+8")
           # and remove any build metadata (anything after a '+' or '-' character)
