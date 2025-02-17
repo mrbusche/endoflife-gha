@@ -93,23 +93,9 @@ jobs:
           minor="${{ matrix.minor }}"
           patch="${{ matrix.patch }}"
 
-          # # For eclipse-temurin, convert the version to Docker tag format.
-          # if [ "$PRODUCT" = "eclipse-temurin" ]; then
-            DOCKER_VERSION=$(echo "$VERSION" | sed 's/+/_/')
-            # this will be covered by actual Dockerfile that is repo specific
-            SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
-          #   # Also set a default runtime path.
-          #   RUNTIME_PATH="/opt/java/openjdk"
-          # elif [ "$PRODUCT" = "python" ]; then
-          #   SOURCE_IMAGE="python:${VERSION}"
-          #   RUNTIME_PATH="/usr/local"  # (Adjust as needed)
-          # elif [ "$PRODUCT" = "nodejs" ]; then
-          #   SOURCE_IMAGE="node:${VERSION}"
-          #   RUNTIME_PATH="/usr/local"  # (Adjust as needed)
-          # else
-          #   echo "Unsupported product: $PRODUCT"
-          #   exit 1
-          # fi
+          DOCKER_VERSION=$(echo "$VERSION" | sed 's/+/_/')
+          # this will be covered by actual Dockerfile that is repo specific
+          SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
 
           DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
 
@@ -185,26 +171,14 @@ jobs:
           minor="${{ matrix.minor }}"
           patch="${{ matrix.patch }}"
 
-          # if [ "$PRODUCT" = "eclipse-temurin" ]; then
-            DOCKER_VERSION=$(echo "$VERSION" | sed 's/+/_/')
-            SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
-          #   RUNTIME_PATH="/opt/java/openjdk"
-          # elif [ "$PRODUCT" = "python" ]; then
-          #   SOURCE_IMAGE="python:${VERSION}"
-          #   RUNTIME_PATH="/usr/local"
-          # elif [ "$PRODUCT" = "nodejs" ]; then
-          #   SOURCE_IMAGE="node:${VERSION}"
-          #   RUNTIME_PATH="/usr/local"
-          # else
-          #   echo "Unsupported product: $PRODUCT"
-          #   exit 1
-          # fi
+          DOCKER_VERSION=$(echo "$VERSION" | sed 's/+/_/')
+          SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
 
           ALPINE_VERSION="${{ steps.alpine.outputs.version }}"
 
-          TAG_MAJOR="${major}-${ALPINE_VERSION}"
-          TAG_MINOR="${major}.${minor}-${ALPINE_VERSION}"
-          TAG_PATCH="${major}.${minor}.${patch}-${ALPINE_VERSION}"
+          TAG_MAJOR="${major}-alpine-${ALPINE_VERSION}"
+          TAG_MINOR="${major}.${minor}-alpine-${ALPINE_VERSION}"
+          TAG_PATCH="${major}.${minor}.${patch}-alpine-${ALPINE_VERSION}"
 
           echo "Building Docker image for $PRODUCT version $VERSION"
           echo "Source image: $SOURCE_IMAGE"
