@@ -214,7 +214,7 @@ jobs:
             --build-arg SOURCE_IMAGE="$SOURCE_IMAGE" \
             --build-arg BASE_IMAGE="alpine:${ALPINE_VERSION}" \
             --build-arg BASE_SUFFIX="" \
-            --build-arg RUNTIME_PATH="$RUNTIME_PATH" \
+            --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
             -t your-docker-username/your-image:"$TAG_PATCH" .
 
           docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MAJOR"
