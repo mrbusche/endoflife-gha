@@ -16,8 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
-    env:
-      PRODUCT: ${{ env.PRODUCT }}
+    # env:
+    #   PRODUCT: ${{ env.PRODUCT }}
     steps:
       - name: Generate Matrix for Supported ${{ env.PRODUCT }} Versions
         id: generate
