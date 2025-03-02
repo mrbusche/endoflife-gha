@@ -101,7 +101,7 @@ jobs:
             --build-arg BASE_IMAGE="${{ inputs.base_image_prefix }}:${OS_VERSION}" \
             --build-arg BASE_SUFFIX="${{ inputs.base_suffix }}" \
             --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
-            -t mrbusche/runtime-tests:"${PRODUCT}-${major}.${minor}.${patch}-${{ inputs.tag_prefix }}${OS_VERSION}" .
+            -t mrbusche/runtime-tests:"${TAG_PATCH}" .
 
           echo "Output variables:"
           echo "TAG_MAJOR=${TAG_MAJOR}"
@@ -114,21 +114,15 @@ jobs:
           echo "major=${major}"
           echo "minor=${minor}"
           echo "patch=${patch}"
-          echo "TAG_PATCH=${PRODUCT}-${major}.${minor}.${patch}-${{ inputs.tag_prefix }}${OS_VERSION}"
           echo "Tagging Docker images..."
 
           docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MAJOR"
           docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MINOR"
 
-          # Construct tag variables.
-          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-${{ inputs.tag_prefix }}${OS_VERSION}"
-          TAG_MAJOR="${PRODUCT}-${major}-${{ inputs.tag_prefix }}${OS_VERSION}"
-          TAG_MINOR="${PRODUCT}-${major}.${minor}-${{ inputs.tag_prefix }}${OS_VERSION}"
-
           # Set outputs for use in later steps.
-          echo "major=${major}" >> "$GITHUB_OUTPUT"
-          echo "minor=${minor}" >> "$GITHUB_OUTPUT"
-          echo "patch=${patch}" >> "$GITHUB_OUTPUT"
+          # echo "major=${major}" >> "$GITHUB_OUTPUT"
+          # echo "minor=${minor}" >> "$GITHUB_OUTPUT"
+          # echo "patch=${patch}" >> "$GITHUB_OUTPUT"
           echo "TAG_PATCH=${TAG_PATCH}" >> "$GITHUB_OUTPUT"
           echo "TAG_MAJOR=${TAG_MAJOR}" >> "$GITHUB_OUTPUT"
           echo "TAG_MINOR=${TAG_MINOR}" >> "$GITHUB_OUTPUT"
