@@ -137,9 +137,9 @@ jobs:
 
           echo "Pushing Docker images for $PRODUCT on Debian:"
           echo "We would need to docker push these images"
-          docker push mrbusche/runtime-tests:"$TAG_PATCH"
-          docker push mrbusche/runtime-tests:"$TAG_MAJOR"
-          docker push mrbusche/runtime-tests:"$TAG_MINOR"
+          # docker push mrbusche/runtime-tests:"$TAG_PATCH"
+          # docker push mrbusche/runtime-tests:"$TAG_MAJOR"
+          # docker push mrbusche/runtime-tests:"$TAG_MINOR"
 
   ##########################
   # BUILD & PUSH JOB: ALPINE
@@ -213,6 +213,6 @@ jobs:
 
           echo "Pushing Docker images for $PRODUCT on Alpine:"
           echo "We would need to docker push these images"
-          docker push mrbusche/runtime-tests:"$TAG_PATCH"
-          docker push mrbusche/runtime-tests:"$TAG_MAJOR"
-          docker push mrbusche/runtime-tests:"$TAG_MINOR"
+          # docker push mrbusche/runtime-tests:"$TAG_PATCH"
+          # docker push mrbusche/runtime-tests:"$TAG_MAJOR"
+          # docker push mrbusche/runtime-tests:"$TAG_MINOR"
