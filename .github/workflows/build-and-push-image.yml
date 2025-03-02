@@ -15,10 +15,6 @@ on:
         description: 'Suffix for the base image (e.g. "-slim" for debian, "" for alpine)'
         required: true
         type: string
-      tag_prefix:
-        description: 'Optional prefix to insert in image tags (e.g. "alpine-" for alpine images)'
-        required: true
-        type: string
       product:
         description: "Product name (e.g. eclipse-temurin)"
         required: true
@@ -94,12 +90,12 @@ jobs:
             --build-arg BASE_IMAGE="${{ inputs.base_image_prefix }}:${OS_VERSION}" \
             --build-arg BASE_SUFFIX="${{ inputs.base_suffix }}" \
             --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
-            -t mrbusche/runtime-tests:"${PRODUCT}-${major}.${minor}.${patch}-${{ inputs.tag_prefix }}${OS_VERSION}" .
+            -t mrbusche/runtime-tests:"${PRODUCT}-${major}.${minor}.${patch}-${{ inputs.base_image_prefix }}${{ inputs.base_suffix }}${OS_VERSION}" .
 
           # Construct tag variables.
-          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-${{ inputs.tag_prefix }}${OS_VERSION}"
-          TAG_MAJOR="${PRODUCT}-${major}-${{ inputs.tag_prefix }}${OS_VERSION}"
-          TAG_MINOR="${PRODUCT}-${major}.${minor}-${{ inputs.tag_prefix }}${OS_VERSION}"
+          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-${{ inputs.base_image_prefix }}${{ inputs.base_suffix }}${OS_VERSION}"
+          TAG_MAJOR="${PRODUCT}-${major}-${{ inputs.base_image_prefix }}${{ inputs.base_suffix }}${OS_VERSION}"
+          TAG_MINOR="${PRODUCT}-${major}.${minor}-${{ inputs.base_image_prefix }}${{ inputs.base_suffix }}${OS_VERSION}"
 
           # Set outputs for use in later steps.
           echo "major=${major}" >> "$GITHUB_OUTPUT"
