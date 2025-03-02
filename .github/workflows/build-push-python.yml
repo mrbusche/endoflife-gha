@@ -1,0 +1,109 @@
+name: Build & Push Docker Images for Python
+
+env:
+  PRODUCT: python
+
+on:
+  push:
+    # branches:
+    #   - main
+  workflow_dispatch:
+
+jobs:
+  ##########################
+  # GENERATE MATRIX JOB
+  ##########################
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    steps:
+      - name: Generate Matrix for Supported ${{ env.PRODUCT }} Versions
+        id: generate
+        run: |
+          PRODUCT="${PRODUCT}"
+          API_URL="https://endoflife.date/api/${PRODUCT}.json"
+          echo "Fetching $PRODUCT versions from $API_URL..."
+          curl -s "$API_URL" -o product.json
+
+          current=$(date +%s)
+          matrix_entries=()
+
+          while IFS= read -r obj; do
+            cycle=$(echo "$obj" | jq -r '.cycle')
+            latest=$(echo "$obj" | jq -r '.latest')
+            eol=$(echo "$obj" | jq -r '.eol')
+
+            if [ -n "$eol" ] && [ "$eol" != "null" ]; then
+              if [ "$eol" = "true" ]; then
+                echo "Skipping version $latest (cycle $cycle) because its EOL flag is set to true."
+                continue
+              elif [ "$eol" = "false" ]; then
+                # EOL is false; do nothing, proceed with this version.
+                :
+              else
+                eol_epoch=$(date -d "$eol" +%s)
+                if [ "$eol_epoch" -lt "$current" ]; then
+                  echo "Skipping version $latest (cycle $cycle) because its EOL ($eol) is in the past."
+                  continue
+                fi
+              fi
+            fi
+
+            version_clean=$(echo "$latest" | sed -E 's/([+-]).*//')
+            IFS='.' read -r major minor patch <<< "$version_clean"
+            if [ -z "$minor" ]; then minor="0"; fi
+            if [ -z "$patch" ]; then patch="0"; fi
+
+            matrix_entries+=("{\"product\":\"$PRODUCT\",\"version\":\"$latest\",\"major\":\"$major\",\"minor\":\"$minor\",\"patch\":\"$patch\"}")
+          done < <(jq -c '.[]' product.json)
+
+          matrix_json=$(IFS=, ; echo "{\"include\": [${matrix_entries[*]}]}")
+          echo "Generated matrix: $matrix_json"
+          echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
+
+  ##########################
+  # BUILD & PUSH JOB: DEBIAN
+  ##########################
+  build-debian:
+    needs: generate-matrix
+    strategy:
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+    uses: ./.github/workflows/build-and-push-image.yml
+    with:
+      os: debian
+      base_suffix: -slim
+      tag_prefix: "" # No extra tag string for Debian
+      product: ${{ matrix.product }}
+      version: ${{ matrix.version }}
+      major: ${{ matrix.major }}
+      minor: ${{ matrix.minor }}
+      patch: ${{ matrix.patch }}
+      repository_name: python
+      docker_file: Dockerfile.python
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  ##########################
+  # BUILD & PUSH JOB: ALPINE
+  ##########################
+  build-alpine:
+    needs: generate-matrix
+    strategy:
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+    uses: ./.github/workflows/build-and-push-image.yml
+    with:
+      os: alpine
+      base_suffix: "" # Alpine images don't use a suffix like "-slim"
+      tag_prefix: alpine-
+      product: ${{ matrix.product }}
+      version: ${{ matrix.version }}
+      major: ${{ matrix.major }}
+      minor: ${{ matrix.minor }}
+      patch: ${{ matrix.patch }}
+      repository_name: python
+      docker_file: Dockerfile.python
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

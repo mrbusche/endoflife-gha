@@ -1,0 +1,28 @@
+# syntax=docker/dockerfile:1
+
+# Global build arguments.
+ARG DOCKER_VERSION
+ARG BASE_IMAGE
+ARG BASE_SUFFIX=
+
+# Stage 1: Pull the prebuilt Eclipse Temurin JRE image.
+FROM python:${DOCKER_VERSION}-jre AS jre
+
+# Stage 2: Use the chosen base image (optionally appending a suffix).
+FROM ${BASE_IMAGE}${BASE_SUFFIX}
+
+# Redeclare the build arguments for this stage.
+ARG DOCKER_VERSION
+ARG BASE_IMAGE
+ARG BASE_SUFFIX
+
+# Output all build argument values for debugging.
+RUN echo "=== Build Arguments ===" && \
+    echo "DOCKER_VERSION: ${DOCKER_VERSION}" && \
+    echo "BASE_IMAGE: ${BASE_IMAGE}" && \
+    echo "BASE_SUFFIX: ${BASE_SUFFIX}" && \
+    echo "Full Base: ${BASE_IMAGE}${BASE_SUFFIX}" && \
+    echo "======================="
+
+# Verify the installation.
+CMD ["python", "-version"]
