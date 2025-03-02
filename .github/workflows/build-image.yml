@@ -1,24 +1,23 @@
 name: Build & Push Docker Images for Multiple Products
 
-# Set a default product (change to "python" or "nodejs" as needed).
 env:
   PRODUCT: eclipse-temurin
+  OS_LIST: '["debian","alpine"]'
 
 on:
-  # pull_request:
   push:
   workflow_dispatch:
 
 jobs:
-  ##########################
-  # GENERATE MATRIX JOB
-  ##########################
+  #############################
+  # GENERATE MATRIX WITH OS DIMENSION
+  #############################
   generate-matrix:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
     steps:
-      - name: Generate Matrix for Supported ${{ env.PRODUCT }} Versions
+      - name: Generate Matrix for Supported ${{ env.PRODUCT }} Versions with OS
         id: generate
         run: |
           # Determine API URL based on product.
@@ -30,13 +29,17 @@ jobs:
           current=$(date +%s)
           matrix_entries=()
 
-          # Iterate over each release object in the JSON.
+          # Parse OS_LIST from the environment.
+          os_list=$(echo '${OS_LIST}' | jq -c '.')
+          echo "Using OS list: $os_list"
+
+          # Iterate over each release object.
           while IFS= read -r obj; do
             cycle=$(echo "$obj" | jq -r '.cycle')
             latest=$(echo "$obj" | jq -r '.latest')
             eol=$(echo "$obj" | jq -r '.eol')
 
-            # If an EOL date exists and is in the past, skip this release.
+            # Skip releases that are past their end-of-life.
             if [ -n "$eol" ] && [ "$eol" != "null" ]; then
               eol_epoch=$(date -d "$eol" +%s)
               if [ "$eol_epoch" -lt "$current" ]; then
@@ -45,26 +48,27 @@ jobs:
               fi
             fi
 
-            # For version parsing: remove build metadata if present.
-            # (For eclipse-temurin, this changes "23.0.2+7" into "23.0.2")
+            # Clean version (remove build metadata if present).
             version_clean=$(echo "$latest" | sed -E 's/([+-]).*//')
             IFS='.' read -r major minor patch <<< "$version_clean"
             if [ -z "$minor" ]; then minor="0"; fi
             if [ -z "$patch" ]; then patch="0"; fi
 
-            # Create a matrix entry.
-            matrix_entries+=("{\"product\":\"$PRODUCT\",\"version\":\"$latest\",\"major\":\"$major\",\"minor\":\"$minor\",\"patch\":\"$patch\"}")
+            # For each OS in OS_LIST, add a matrix entry.
+            for os in $(echo "$os_list" | jq -r '.[]'); do
+              matrix_entries+=("{\"product\":\"$PRODUCT\",\"version\":\"$latest\",\"major\":\"$major\",\"minor\":\"$minor\",\"patch\":\"$patch\",\"os\":\"$os\"}")
+            done
           done < <(jq -c '.[]' product.json)
 
-          # Assemble the JSON matrix.
+          # Assemble the final matrix JSON.
           matrix_json=$(IFS=, ; echo "{\"include\": [${matrix_entries[*]}]}")
           echo "Generated matrix: $matrix_json"
           echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
 
-  ##########################
-  # BUILD & PUSH JOB: DEBIAN
-  ##########################
-  build-debian:
+  #############################
+  # SINGLE BUILD JOB USING MATRIX
+  #############################
+  build-images:
     needs: generate-matrix
     runs-on: ubuntu-latest
     strategy:
@@ -73,120 +77,58 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Fetch latest Debian codename
-        id: debian
+      - name: Set OS-Specific Variables
+        id: set-vars
         run: |
-          echo "Fetching latest Debian codename..."
-          DEBIAN_JSON=$(curl -s https://endoflife.date/api/debian.json)
-          # Use the "codename" from the first object and convert to lower case.
-          DEBIAN_CODENAME=$(echo "$DEBIAN_JSON" | jq -r '.[0].codename' | tr '[:upper:]' '[:lower:]')
-          echo "Debian codename: $DEBIAN_CODENAME"
-          echo "version=$DEBIAN_CODENAME" >> "$GITHUB_OUTPUT"
+          if [ "${{ matrix.os }}" = "debian" ]; then
+            echo "Fetching latest Debian codename..."
+            DEBIAN_JSON=$(curl -s https://endoflife.date/api/debian.json)
+            OS_VERSION=$(echo "$DEBIAN_JSON" | jq -r '.[0].codename' | tr '[:upper:]' '[:lower:]')
+            BASE_SUFFIX="-slim"
+          elif [ "${{ matrix.os }}" = "alpine" ]; then
+            echo "Fetching latest Alpine version..."
+            ALPINE_JSON=$(curl -s https://endoflife.date/api/alpine.json)
+            OS_VERSION=$(echo "$ALPINE_JSON" | jq -r '.[0].latest')
+            BASE_SUFFIX=""
+          else
+            echo "Unsupported OS: ${{ matrix.os }}"
+            exit 1
+          fi
+          echo "os_version=$OS_VERSION" >> "$GITHUB_OUTPUT"
+          echo "base_suffix=$BASE_SUFFIX" >> "$GITHUB_OUTPUT"
 
-      - name: Build Docker image (Debian)
-        run: |
-          # Get matrix values.
-          PRODUCT="${{ matrix.product }}"
-          VERSION="${{ matrix.version }}"
-          major="${{ matrix.major }}"
-          minor="${{ matrix.minor }}"
-          patch="${{ matrix.patch }}"
-
-          DOCKER_VERSION=$(echo "$VERSION" | sed 's/+/_/')
-          # this will be covered by actual Dockerfile that is repo specific
-          SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
-
-          DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
-
-          # Construct image tags (append OS info).
-          TAG_MAJOR="${major}-${DEBIAN_CODENAME}"
-          TAG_MINOR="${major}.${minor}-${DEBIAN_CODENAME}"
-          TAG_PATCH="${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
-
-          echo "Building Docker image for $PRODUCT version $VERSION"
-          echo "Source image: $SOURCE_IMAGE"
-          echo "Base image: debian:${DEBIAN_CODENAME}-slim"
-
-          docker build \
-            --build-arg SOURCE_IMAGE="$SOURCE_IMAGE" \
-            --build-arg BASE_IMAGE="debian:${DEBIAN_CODENAME}" \
-            --build-arg BASE_SUFFIX="-slim" \
-            --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
-            -t your-docker-username/your-image:"$TAG_PATCH" .
-
-          docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MAJOR"
-          docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MINOR"
-
-      # - name: Log in to Docker Hub (Debian)
-      #   uses: docker/login-action@v2
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Push Docker images (Debian)
-        run: |
-          PRODUCT="${{ matrix.product }}"
-          major="${{ matrix.major }}"
-          minor="${{ matrix.minor }}"
-          patch="${{ matrix.patch }}"
-          DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
-
-          TAG_MAJOR="${major}-${DEBIAN_CODENAME}"
-          TAG_MINOR="${major}.${minor}-${DEBIAN_CODENAME}"
-          TAG_PATCH="${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
-
-          echo "Pushing Docker images for $PRODUCT on Debian:"
-          echo "We would need to docker push these images"
-          # docker push your-docker-username/your-image:"$TAG_PATCH"
-          # docker push your-docker-username/your-image:"$TAG_MAJOR"
-          # docker push your-docker-username/your-image:"$TAG_MINOR"
-
-  ##########################
-  # BUILD & PUSH JOB: ALPINE
-  ##########################
-  build-alpine:
-    needs: generate-matrix
-    runs-on: ubuntu-latest
-    strategy:
-      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Fetch latest Alpine version
-        id: alpine
-        run: |
-          echo "Fetching latest Alpine version..."
-          ALPINE_JSON=$(curl -s https://endoflife.date/api/alpine.json)
-          ALPINE_VERSION=$(echo "$ALPINE_JSON" | jq -r '.[0].latest')
-          echo "Alpine version: $ALPINE_VERSION"
-          echo "version=$ALPINE_VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Build Docker image (Alpine)
+      - name: Build Docker Image
         run: |
           PRODUCT="${{ matrix.product }}"
           VERSION="${{ matrix.version }}"
           major="${{ matrix.major }}"
           minor="${{ matrix.minor }}"
           patch="${{ matrix.patch }}"
-
+          os="${{ matrix.os }}"
           DOCKER_VERSION=$(echo "$VERSION" | sed 's/+/_/')
           SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
+          OS_VERSION="${{ steps.set-vars.outputs.os_version }}"
+          BASE_SUFFIX="${{ steps.set-vars.outputs.base_suffix }}"
 
-          ALPINE_VERSION="${{ steps.alpine.outputs.version }}"
+          if [ "$os" = "debian" ]; then
+            BASE_IMAGE="debian:${OS_VERSION}"
+            TAG_MAJOR="${major}-${OS_VERSION}"
+            TAG_MINOR="${major}.${minor}-${OS_VERSION}"
+            TAG_PATCH="${major}.${minor}.${patch}-${OS_VERSION}"
+          elif [ "$os" = "alpine" ]; then
+            BASE_IMAGE="alpine:${OS_VERSION}"
+            TAG_MAJOR="${major}-alpine-${OS_VERSION}"
+            TAG_MINOR="${major}.${minor}-alpine-${OS_VERSION}"
+            TAG_PATCH="${major}.${minor}.${patch}-alpine-${OS_VERSION}"
+          fi
 
-          TAG_MAJOR="${major}-alpine-${ALPINE_VERSION}"
-          TAG_MINOR="${major}.${minor}-alpine-${ALPINE_VERSION}"
-          TAG_PATCH="${major}.${minor}.${patch}-alpine-${ALPINE_VERSION}"
-
-          echo "Building Docker image for $PRODUCT version $VERSION"
+          echo "Building Docker image for $PRODUCT version $VERSION on $os"
           echo "Source image: $SOURCE_IMAGE"
-          echo "Base image: alpine:${ALPINE_VERSION}"
-
+          echo "Base image: $BASE_IMAGE $BASE_SUFFIX"
           docker build \
             --build-arg SOURCE_IMAGE="$SOURCE_IMAGE" \
-            --build-arg BASE_IMAGE="alpine:${ALPINE_VERSION}" \
-            --build-arg BASE_SUFFIX="" \
+            --build-arg BASE_IMAGE="$BASE_IMAGE" \
+            --build-arg BASE_SUFFIX="$BASE_SUFFIX" \
             --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
             -t your-docker-username/your-image:"$TAG_PATCH" .
 
@@ -198,21 +140,26 @@ jobs:
       #   with:
       #     username: ${{ secrets.DOCKERHUB_USERNAME }}
       #     password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Push Docker images (Alpine)
+      - name: Push Docker Images
         run: |
           PRODUCT="${{ matrix.product }}"
           major="${{ matrix.major }}"
           minor="${{ matrix.minor }}"
           patch="${{ matrix.patch }}"
-          ALPINE_VERSION="${{ steps.alpine.outputs.version }}"
+          os="${{ matrix.os }}"
+          OS_VERSION="${{ steps.set-vars.outputs.os_version }}"
+          if [ "$os" = "debian" ]; then
+            TAG_MAJOR="${major}-${OS_VERSION}"
+            TAG_MINOR="${major}.${minor}-${OS_VERSION}"
+            TAG_PATCH="${major}.${minor}.${patch}-${OS_VERSION}"
+          elif [ "$os" = "alpine" ]; then
+            TAG_MAJOR="${major}-alpine-${OS_VERSION}"
+            TAG_MINOR="${major}.${minor}-alpine-${OS_VERSION}"
+            TAG_PATCH="${major}.${minor}.${patch}-alpine-${OS_VERSION}"
+          fi
 
-          TAG_MAJOR="${major}-${ALPINE_VERSION}"
-          TAG_MINOR="${major}.${minor}-${ALPINE_VERSION}"
-          TAG_PATCH="${major}.${minor}.${patch}-${ALPINE_VERSION}"
-
-          echo "Pushing Docker images for $PRODUCT on Alpine:"
-          echo "We would need to docker push these images"
+          echo "Pushing Docker images for $PRODUCT on $os:"
+          # Uncomment the following lines to push the images:
           # docker push your-docker-username/your-image:"$TAG_PATCH"
           # docker push your-docker-username/your-image:"$TAG_MAJOR"
           # docker push your-docker-username/your-image:"$TAG_MINOR"
