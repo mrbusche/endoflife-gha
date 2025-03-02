@@ -99,9 +99,9 @@ jobs:
           DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
 
           # Construct image tags (append OS info).
-          TAG_MAJOR="${major}-${DEBIAN_CODENAME}"
-          TAG_MINOR="${major}.${minor}-${DEBIAN_CODENAME}"
-          TAG_PATCH="${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
+          TAG_MAJOR="${PRODUCT}-${major}-${DEBIAN_CODENAME}"
+          TAG_MINOR="${PRODUCT}-${major}.${minor}-${DEBIAN_CODENAME}"
+          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
 
           echo "Building Docker image for $PRODUCT version $VERSION"
           echo "Source image: $SOURCE_IMAGE"
