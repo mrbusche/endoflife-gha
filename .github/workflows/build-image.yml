@@ -207,9 +207,9 @@ jobs:
           patch="${{ matrix.patch }}"
           ALPINE_VERSION="${{ steps.alpine.outputs.version }}"
 
-          TAG_MAJOR="${major}-${ALPINE_VERSION}"
-          TAG_MINOR="${major}.${minor}-${ALPINE_VERSION}"
-          TAG_PATCH="${major}.${minor}.${patch}-${ALPINE_VERSION}"
+          TAG_MAJOR="${PRODUCT}-${major}-alpine-${ALPINE_VERSION}"
+          TAG_MINOR="${PRODUCT}-${major}.${minor}-alpine-${ALPINE_VERSION}"
+          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-alpine-${ALPINE_VERSION}"
 
           echo "Pushing Docker images for $PRODUCT on Alpine:"
           echo "We would need to docker push these images"
