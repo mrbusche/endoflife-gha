@@ -65,6 +65,9 @@ jobs:
             echo "Fetching latest Alpine version..."
             OS_JSON=$(curl -s https://endoflife.date/api/alpine.json)
             OS_VERSION=$(echo "$OS_JSON" | jq -r '.[0].latest')
+            if [[ ! $OS_VERSION == *"alpine"* ]]; then
+              OS_VERSION="alpine-$OS_VERSION"
+            fi
           else
             echo "Unsupported OS: ${{ inputs.os }}"
             exit 1
