@@ -96,6 +96,13 @@ jobs:
             --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
             -t mrbusche/runtime-tests:"${PRODUCT}-${major}.${minor}.${patch}-${{ inputs.tag_prefix }}${OS_VERSION}" .
 
+          echo "Output variables:"
+          echo "major=${major}"
+          echo "minor=${minor}"
+          echo "patch=${patch}"
+          echo "TAG_PATCH=${PRODUCT}-${major}.${minor}.${patch}-${{ inputs.tag_prefix }}${OS_VERSION}"
+          echo "Tagging Docker images..."
+
           docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MAJOR"
           docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MINOR"
 
