@@ -39,6 +39,23 @@ on:
         description: "Patch version number"
         required: true
         type: string
+
+      # Optional inputs
+      docker_file:
+        description: "Path to the Dockerfile to use"
+        required: false
+        type: string
+        default: Dockerfile
+      build_minor:
+        description: "Whether to build minor versions"
+        required: false
+        type: boolean
+        default: true
+      build_patch:
+        description: "Whether to build patch versions"
+        required: false
+        type: boolean
+        default: true
     secrets:
       DOCKERHUB_USERNAME:
         required: true
@@ -99,16 +116,21 @@ jobs:
             --build-arg BASE_IMAGE="${{ inputs.os }}:${OS_VERSION}" \
             --build-arg BASE_SUFFIX="${{ inputs.base_suffix }}" \
             --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
-            -t mrbusche/${REPOSITORY_NAME}:"${TAG_PATCH}" .
+            -f ${{ inputs.docker_file }} \
+            -t mrbusche/${REPOSITORY_NAME}:"${TAG_MAJOR}" .
 
           echo "Tagging Docker images..."
-          docker tag mrbusche/${REPOSITORY_NAME}:"$TAG_PATCH" mrbusche/${REPOSITORY_NAME}:"$TAG_MAJOR"
-          docker tag mrbusche/${REPOSITORY_NAME}:"$TAG_PATCH" mrbusche/${REPOSITORY_NAME}:"$TAG_MINOR"
+          if [ "${{ inputs.build_minor }}" = "true" ]; then
+            docker tag mrbusche/${REPOSITORY_NAME}:"$TAG_MAJOR" mrbusche/${REPOSITORY_NAME}:"$TAG_MINOR"
+          fi
+          if [ "${{ inputs.build_patch }}" = "true" ]; then
+            docker tag mrbusche/${REPOSITORY_NAME}:"$TAG_MAJOR" mrbusche/${REPOSITORY_NAME}:"$TAG_PATCH"
+          fi
 
           # Set outputs for use in later steps.
-          echo "TAG_PATCH=${TAG_PATCH}" >> "$GITHUB_OUTPUT"
           echo "TAG_MAJOR=${TAG_MAJOR}" >> "$GITHUB_OUTPUT"
           echo "TAG_MINOR=${TAG_MINOR}" >> "$GITHUB_OUTPUT"
+          echo "TAG_PATCH=${TAG_PATCH}" >> "$GITHUB_OUTPUT"
           echo "REPOSITORY_NAME=${REPOSITORY_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to Docker Hub
@@ -121,6 +143,10 @@ jobs:
         run: |
           REPOSITORY_NAME="${{ inputs.repository_name }}"
           echo "Pushing Docker images for ${RESPOSITORY_NAME} on ${{ inputs.os }}..."
-          docker push mrbusche/${REPOSITORY_NAME}:"${{ steps.build.outputs.TAG_PATCH }}"
           docker push mrbusche/${REPOSITORY_NAME}:"${{ steps.build.outputs.TAG_MAJOR }}"
-          docker push mrbusche/${REPOSITORY_NAME}:"${{ steps.build.outputs.TAG_MINOR }}"
+          if [ "${{ inputs.build_minor }}" = "true" ]; then
+            docker push mrbusche/${REPOSITORY_NAME}:"${{ steps.build.outputs.TAG_MINOR }}"
+          fi
+          if [ "${{ inputs.build_patch }}" = "true" ]; then
+            docker push mrbusche/${REPOSITORY_NAME}:"${{ steps.build.outputs.TAG_PATCH }}"
+          fi

@@ -1,4 +1,4 @@
-name: Build & Push Docker Images for Multiple Products
+name: Build & Push Docker Images for Java
 
 env:
   PRODUCT: eclipse-temurin
