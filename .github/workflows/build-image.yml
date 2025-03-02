@@ -112,16 +112,16 @@ jobs:
             --build-arg BASE_IMAGE="debian:${DEBIAN_CODENAME}" \
             --build-arg BASE_SUFFIX="-slim" \
             --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
-            -t your-docker-username/your-image:"$TAG_PATCH" .
+            -t mrbusche/runtime-tests:"$TAG_PATCH" .
 
-          docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MAJOR"
-          docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MINOR"
+          docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MAJOR"
+          docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MINOR"
 
-      # - name: Log in to Docker Hub (Debian)
-      #   uses: docker/login-action@v2
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub (Debian)
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Push Docker images (Debian)
         run: |
@@ -137,9 +137,9 @@ jobs:
 
           echo "Pushing Docker images for $PRODUCT on Debian:"
           echo "We would need to docker push these images"
-          # docker push your-docker-username/your-image:"$TAG_PATCH"
-          # docker push your-docker-username/your-image:"$TAG_MAJOR"
-          # docker push your-docker-username/your-image:"$TAG_MINOR"
+          docker push mrbusche/runtime-tests:"$TAG_PATCH"
+          docker push mrbusche/runtime-tests:"$TAG_MAJOR"
+          docker push mrbusche/runtime-tests:"$TAG_MINOR"
 
   ##########################
   # BUILD & PUSH JOB: ALPINE
@@ -188,10 +188,10 @@ jobs:
             --build-arg BASE_IMAGE="alpine:${ALPINE_VERSION}" \
             --build-arg BASE_SUFFIX="" \
             --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
-            -t your-docker-username/your-image:"$TAG_PATCH" .
+            -t mrbusche/runtime-tests:"$TAG_PATCH" .
 
-          docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MAJOR"
-          docker tag your-docker-username/your-image:"$TAG_PATCH" your-docker-username/your-image:"$TAG_MINOR"
+          docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MAJOR"
+          docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MINOR"
 
       # - name: Log in to Docker Hub (Alpine)
       #   uses: docker/login-action@v2
@@ -213,6 +213,6 @@ jobs:
 
           echo "Pushing Docker images for $PRODUCT on Alpine:"
           echo "We would need to docker push these images"
-          # docker push your-docker-username/your-image:"$TAG_PATCH"
-          # docker push your-docker-username/your-image:"$TAG_MAJOR"
-          # docker push your-docker-username/your-image:"$TAG_MINOR"
+          # docker push mrbusche/runtime-tests:"$TAG_PATCH"
+          # docker push mrbusche/runtime-tests:"$TAG_MAJOR"
+          # docker push mrbusche/runtime-tests:"$TAG_MINOR"
