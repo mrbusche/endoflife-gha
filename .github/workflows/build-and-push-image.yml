@@ -39,6 +39,11 @@ on:
         description: "Patch version number"
         required: true
         type: string
+      docker_file:
+        description: "Path to the Dockerfile to use"
+        required: false
+        type: string
+        default: Dockerfile
     secrets:
       DOCKERHUB_USERNAME:
         required: true
@@ -99,6 +104,7 @@ jobs:
             --build-arg BASE_IMAGE="${{ inputs.os }}:${OS_VERSION}" \
             --build-arg BASE_SUFFIX="${{ inputs.base_suffix }}" \
             --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
+            -f Dockerfile.java
             -t mrbusche/${REPOSITORY_NAME}:"${TAG_PATCH}" .
 
           echo "Tagging Docker images..."
