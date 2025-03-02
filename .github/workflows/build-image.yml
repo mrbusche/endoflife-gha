@@ -1,218 +1,218 @@
-# name: Build & Push Docker Images for Multiple Products
+name: Build & Push Docker Images for Multiple Products
 
-# # Set a default product (change to "python" or "nodejs" as needed).
-# env:
-#   PRODUCT: eclipse-temurin
+# Set a default product (change to "python" or "nodejs" as needed).
+env:
+  PRODUCT: eclipse-temurin
 
-# on:
-#   # pull_request:
-#   push:
-#   workflow_dispatch:
+on:
+  # pull_request:
+  push:
+  workflow_dispatch:
 
-# jobs:
-#   ##########################
-#   # GENERATE MATRIX JOB
-#   ##########################
-#   generate-matrix:
-#     runs-on: ubuntu-latest
-#     outputs:
-#       matrix: ${{ steps.generate.outputs.matrix }}
-#     steps:
-#       - name: Generate Matrix for Supported ${{ env.PRODUCT }} Versions
-#         id: generate
-#         run: |
-#           # Determine API URL based on product.
-#           PRODUCT="${PRODUCT}"
-#           API_URL="https://endoflife.date/api/${PRODUCT}.json"
-#           echo "Fetching $PRODUCT versions from $API_URL..."
-#           curl -s "$API_URL" -o product.json
+jobs:
+  ##########################
+  # GENERATE MATRIX JOB
+  ##########################
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    steps:
+      - name: Generate Matrix for Supported ${{ env.PRODUCT }} Versions
+        id: generate
+        run: |
+          # Determine API URL based on product.
+          PRODUCT="${PRODUCT}"
+          API_URL="https://endoflife.date/api/${PRODUCT}.json"
+          echo "Fetching $PRODUCT versions from $API_URL..."
+          curl -s "$API_URL" -o product.json
 
-#           current=$(date +%s)
-#           matrix_entries=()
+          current=$(date +%s)
+          matrix_entries=()
 
-#           # Iterate over each release object in the JSON.
-#           while IFS= read -r obj; do
-#             cycle=$(echo "$obj" | jq -r '.cycle')
-#             latest=$(echo "$obj" | jq -r '.latest')
-#             eol=$(echo "$obj" | jq -r '.eol')
+          # Iterate over each release object in the JSON.
+          while IFS= read -r obj; do
+            cycle=$(echo "$obj" | jq -r '.cycle')
+            latest=$(echo "$obj" | jq -r '.latest')
+            eol=$(echo "$obj" | jq -r '.eol')
 
-#             # If an EOL date exists and is in the past, skip this release.
-#             if [ -n "$eol" ] && [ "$eol" != "null" ]; then
-#               eol_epoch=$(date -d "$eol" +%s)
-#               if [ "$eol_epoch" -lt "$current" ]; then
-#                 echo "Skipping version $latest (cycle $cycle) because its EOL ($eol) is in the past."
-#                 continue
-#               fi
-#             fi
+            # If an EOL date exists and is in the past, skip this release.
+            if [ -n "$eol" ] && [ "$eol" != "null" ]; then
+              eol_epoch=$(date -d "$eol" +%s)
+              if [ "$eol_epoch" -lt "$current" ]; then
+                echo "Skipping version $latest (cycle $cycle) because its EOL ($eol) is in the past."
+                continue
+              fi
+            fi
 
-#             # For version parsing: remove build metadata if present.
-#             # (For eclipse-temurin, this changes "23.0.2+7" into "23.0.2")
-#             version_clean=$(echo "$latest" | sed -E 's/([+-]).*//')
-#             IFS='.' read -r major minor patch <<< "$version_clean"
-#             if [ -z "$minor" ]; then minor="0"; fi
-#             if [ -z "$patch" ]; then patch="0"; fi
+            # For version parsing: remove build metadata if present.
+            # (For eclipse-temurin, this changes "23.0.2+7" into "23.0.2")
+            version_clean=$(echo "$latest" | sed -E 's/([+-]).*//')
+            IFS='.' read -r major minor patch <<< "$version_clean"
+            if [ -z "$minor" ]; then minor="0"; fi
+            if [ -z "$patch" ]; then patch="0"; fi
 
-#             # Create a matrix entry.
-#             matrix_entries+=("{\"product\":\"$PRODUCT\",\"version\":\"$latest\",\"major\":\"$major\",\"minor\":\"$minor\",\"patch\":\"$patch\"}")
-#           done < <(jq -c '.[]' product.json)
+            # Create a matrix entry.
+            matrix_entries+=("{\"product\":\"$PRODUCT\",\"version\":\"$latest\",\"major\":\"$major\",\"minor\":\"$minor\",\"patch\":\"$patch\"}")
+          done < <(jq -c '.[]' product.json)
 
-#           # Assemble the JSON matrix.
-#           matrix_json=$(IFS=, ; echo "{\"include\": [${matrix_entries[*]}]}")
-#           echo "Generated matrix: $matrix_json"
-#           echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
+          # Assemble the JSON matrix.
+          matrix_json=$(IFS=, ; echo "{\"include\": [${matrix_entries[*]}]}")
+          echo "Generated matrix: $matrix_json"
+          echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
 
-#   ##########################
-#   # BUILD & PUSH JOB: DEBIAN
-#   ##########################
-#   build-debian:
-#     needs: generate-matrix
-#     runs-on: ubuntu-latest
-#     strategy:
-#       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
-#     steps:
-#       - name: Checkout repository
-#         uses: actions/checkout@v3
+  ##########################
+  # BUILD & PUSH JOB: DEBIAN
+  ##########################
+  build-debian:
+    needs: generate-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-#       - name: Fetch latest Debian codename
-#         id: debian
-#         run: |
-#           echo "Fetching latest Debian codename..."
-#           DEBIAN_JSON=$(curl -s https://endoflife.date/api/debian.json)
-#           # Use the "codename" from the first object and convert to lower case.
-#           DEBIAN_CODENAME=$(echo "$DEBIAN_JSON" | jq -r '.[0].codename' | tr '[:upper:]' '[:lower:]')
-#           echo "Debian codename: $DEBIAN_CODENAME"
-#           echo "version=$DEBIAN_CODENAME" >> "$GITHUB_OUTPUT"
+      - name: Fetch latest Debian codename
+        id: debian
+        run: |
+          echo "Fetching latest Debian codename..."
+          DEBIAN_JSON=$(curl -s https://endoflife.date/api/debian.json)
+          # Use the "codename" from the first object and convert to lower case.
+          DEBIAN_CODENAME=$(echo "$DEBIAN_JSON" | jq -r '.[0].codename' | tr '[:upper:]' '[:lower:]')
+          echo "Debian codename: $DEBIAN_CODENAME"
+          echo "version=$DEBIAN_CODENAME" >> "$GITHUB_OUTPUT"
 
-#       - name: Build Docker image (Debian)
-#         run: |
-#           # Get matrix values.
-#           PRODUCT="${{ matrix.product }}"
-#           VERSION="${{ matrix.version }}"
-#           major="${{ matrix.major }}"
-#           minor="${{ matrix.minor }}"
-#           patch="${{ matrix.patch }}"
+      - name: Build Docker image (Debian)
+        run: |
+          # Get matrix values.
+          PRODUCT="${{ matrix.product }}"
+          VERSION="${{ matrix.version }}"
+          major="${{ matrix.major }}"
+          minor="${{ matrix.minor }}"
+          patch="${{ matrix.patch }}"
 
-#           DOCKER_VERSION=$(echo "$VERSION" | sed 's/+/_/')
-#           # this will be covered by actual Dockerfile that is repo specific
-#           SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
+          DOCKER_VERSION=$(echo "$VERSION" | sed 's/+/_/')
+          # this will be covered by actual Dockerfile that is repo specific
+          SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
 
-#           DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
+          DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
 
-#           # Construct image tags (append OS info).
-#           TAG_MAJOR="${PRODUCT}-${major}-${DEBIAN_CODENAME}"
-#           TAG_MINOR="${PRODUCT}-${major}.${minor}-${DEBIAN_CODENAME}"
-#           TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
+          # Construct image tags (append OS info).
+          TAG_MAJOR="${PRODUCT}-${major}-${DEBIAN_CODENAME}"
+          TAG_MINOR="${PRODUCT}-${major}.${minor}-${DEBIAN_CODENAME}"
+          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
 
-#           echo "Building Docker image for $PRODUCT version $VERSION"
-#           echo "Source image: $SOURCE_IMAGE"
-#           echo "Base image: debian:${DEBIAN_CODENAME}-slim"
+          echo "Building Docker image for $PRODUCT version $VERSION"
+          echo "Source image: $SOURCE_IMAGE"
+          echo "Base image: debian:${DEBIAN_CODENAME}-slim"
 
-#           docker build \
-#             --build-arg SOURCE_IMAGE="$SOURCE_IMAGE" \
-#             --build-arg BASE_IMAGE="debian:${DEBIAN_CODENAME}" \
-#             --build-arg BASE_SUFFIX="-slim" \
-#             --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
-#             -t mrbusche/runtime-tests:"$TAG_PATCH" .
+          docker build \
+            --build-arg SOURCE_IMAGE="$SOURCE_IMAGE" \
+            --build-arg BASE_IMAGE="debian:${DEBIAN_CODENAME}" \
+            --build-arg BASE_SUFFIX="-slim" \
+            --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
+            -t mrbusche/runtime-tests:"$TAG_PATCH" .
 
-#           docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MAJOR"
-#           docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MINOR"
+          docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MAJOR"
+          docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MINOR"
 
-#       - name: Log in to Docker Hub (Debian)
-#         uses: docker/login-action@v2
-#         with:
-#           username: ${{ secrets.DOCKERHUB_USERNAME }}
-#           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub (Debian)
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-#       - name: Push Docker images (Debian)
-#         run: |
-#           PRODUCT="${{ matrix.product }}"
-#           major="${{ matrix.major }}"
-#           minor="${{ matrix.minor }}"
-#           patch="${{ matrix.patch }}"
-#           DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
+      - name: Push Docker images (Debian)
+        run: |
+          PRODUCT="${{ matrix.product }}"
+          major="${{ matrix.major }}"
+          minor="${{ matrix.minor }}"
+          patch="${{ matrix.patch }}"
+          DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
 
-#           TAG_MAJOR="${PRODUCT}-${major}-${DEBIAN_CODENAME}"
-#           TAG_MINOR="${PRODUCT}-${major}.${minor}-${DEBIAN_CODENAME}"
-#           TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
+          TAG_MAJOR="${PRODUCT}-${major}-${DEBIAN_CODENAME}"
+          TAG_MINOR="${PRODUCT}-${major}.${minor}-${DEBIAN_CODENAME}"
+          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
 
-#           echo "Pushing Docker images for $PRODUCT on Debian:"
-#           echo "We would need to docker push these images"
-#           # docker push mrbusche/runtime-tests:"$TAG_PATCH"
-#           # docker push mrbusche/runtime-tests:"$TAG_MAJOR"
-#           # docker push mrbusche/runtime-tests:"$TAG_MINOR"
+          echo "Pushing Docker images for $PRODUCT on Debian:"
+          echo "We would need to docker push these images"
+          # docker push mrbusche/runtime-tests:"$TAG_PATCH"
+          # docker push mrbusche/runtime-tests:"$TAG_MAJOR"
+          # docker push mrbusche/runtime-tests:"$TAG_MINOR"
 
-#   ##########################
-#   # BUILD & PUSH JOB: ALPINE
-#   ##########################
-#   build-alpine:
-#     needs: generate-matrix
-#     runs-on: ubuntu-latest
-#     strategy:
-#       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
-#     steps:
-#       - name: Checkout repository
-#         uses: actions/checkout@v3
+  ##########################
+  # BUILD & PUSH JOB: ALPINE
+  ##########################
+  build-alpine:
+    needs: generate-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-#       - name: Fetch latest Alpine version
-#         id: alpine
-#         run: |
-#           echo "Fetching latest Alpine version..."
-#           ALPINE_JSON=$(curl -s https://endoflife.date/api/alpine.json)
-#           ALPINE_VERSION=$(echo "$ALPINE_JSON" | jq -r '.[0].latest')
-#           echo "Alpine version: $ALPINE_VERSION"
-#           echo "version=$ALPINE_VERSION" >> "$GITHUB_OUTPUT"
+      - name: Fetch latest Alpine version
+        id: alpine
+        run: |
+          echo "Fetching latest Alpine version..."
+          ALPINE_JSON=$(curl -s https://endoflife.date/api/alpine.json)
+          ALPINE_VERSION=$(echo "$ALPINE_JSON" | jq -r '.[0].latest')
+          echo "Alpine version: $ALPINE_VERSION"
+          echo "version=$ALPINE_VERSION" >> "$GITHUB_OUTPUT"
 
-#       - name: Build Docker image (Alpine)
-#         run: |
-#           PRODUCT="${{ matrix.product }}"
-#           VERSION="${{ matrix.version }}"
-#           major="${{ matrix.major }}"
-#           minor="${{ matrix.minor }}"
-#           patch="${{ matrix.patch }}"
+      - name: Build Docker image (Alpine)
+        run: |
+          PRODUCT="${{ matrix.product }}"
+          VERSION="${{ matrix.version }}"
+          major="${{ matrix.major }}"
+          minor="${{ matrix.minor }}"
+          patch="${{ matrix.patch }}"
 
-#           DOCKER_VERSION=$(echo "$VERSION" | sed 's/+/_/')
-#           SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
+          DOCKER_VERSION=$(echo "$VERSION" | sed 's/+/_/')
+          SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
 
-#           ALPINE_VERSION="${{ steps.alpine.outputs.version }}"
+          ALPINE_VERSION="${{ steps.alpine.outputs.version }}"
 
-#           TAG_MAJOR="${PRODUCT}-${major}-alpine-${ALPINE_VERSION}"
-#           TAG_MINOR="${PRODUCT}-${major}.${minor}-alpine-${ALPINE_VERSION}"
-#           TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-alpine-${ALPINE_VERSION}"
+          TAG_MAJOR="${PRODUCT}-${major}-alpine-${ALPINE_VERSION}"
+          TAG_MINOR="${PRODUCT}-${major}.${minor}-alpine-${ALPINE_VERSION}"
+          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-alpine-${ALPINE_VERSION}"
 
-#           echo "Building Docker image for $PRODUCT version $VERSION"
-#           echo "Source image: $SOURCE_IMAGE"
-#           echo "Base image: alpine:${ALPINE_VERSION}"
+          echo "Building Docker image for $PRODUCT version $VERSION"
+          echo "Source image: $SOURCE_IMAGE"
+          echo "Base image: alpine:${ALPINE_VERSION}"
 
-#           docker build \
-#             --build-arg SOURCE_IMAGE="$SOURCE_IMAGE" \
-#             --build-arg BASE_IMAGE="alpine:${ALPINE_VERSION}" \
-#             --build-arg BASE_SUFFIX="" \
-#             --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
-#             -t mrbusche/runtime-tests:"$TAG_PATCH" .
+          docker build \
+            --build-arg SOURCE_IMAGE="$SOURCE_IMAGE" \
+            --build-arg BASE_IMAGE="alpine:${ALPINE_VERSION}" \
+            --build-arg BASE_SUFFIX="" \
+            --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
+            -t mrbusche/runtime-tests:"$TAG_PATCH" .
 
-#           docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MAJOR"
-#           docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MINOR"
+          docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MAJOR"
+          docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MINOR"
 
-#       - name: Log in to Docker Hub (Alpine)
-#         uses: docker/login-action@v2
-#         with:
-#           username: ${{ secrets.DOCKERHUB_USERNAME }}
-#           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub (Alpine)
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-#       - name: Push Docker images (Alpine)
-#         run: |
-#           PRODUCT="${{ matrix.product }}"
-#           major="${{ matrix.major }}"
-#           minor="${{ matrix.minor }}"
-#           patch="${{ matrix.patch }}"
-#           ALPINE_VERSION="${{ steps.alpine.outputs.version }}"
+      - name: Push Docker images (Alpine)
+        run: |
+          PRODUCT="${{ matrix.product }}"
+          major="${{ matrix.major }}"
+          minor="${{ matrix.minor }}"
+          patch="${{ matrix.patch }}"
+          ALPINE_VERSION="${{ steps.alpine.outputs.version }}"
 
-#           TAG_MAJOR="${PRODUCT}-${major}-alpine-${ALPINE_VERSION}"
-#           TAG_MINOR="${PRODUCT}-${major}.${minor}-alpine-${ALPINE_VERSION}"
-#           TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-alpine-${ALPINE_VERSION}"
+          TAG_MAJOR="${PRODUCT}-${major}-alpine-${ALPINE_VERSION}"
+          TAG_MINOR="${PRODUCT}-${major}.${minor}-alpine-${ALPINE_VERSION}"
+          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-alpine-${ALPINE_VERSION}"
 
-#           echo "Pushing Docker images for $PRODUCT on Alpine:"
-#           echo "We would need to docker push these images"
-#           # docker push mrbusche/runtime-tests:"$TAG_PATCH"
-#           # docker push mrbusche/runtime-tests:"$TAG_MAJOR"
-#           # docker push mrbusche/runtime-tests:"$TAG_MINOR"
+          echo "Pushing Docker images for $PRODUCT on Alpine:"
+          echo "We would need to docker push these images"
+          # docker push mrbusche/runtime-tests:"$TAG_PATCH"
+          # docker push mrbusche/runtime-tests:"$TAG_MAJOR"
+          # docker push mrbusche/runtime-tests:"$TAG_MINOR"
