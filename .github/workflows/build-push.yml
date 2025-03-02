@@ -85,7 +85,7 @@ jobs:
     with:
       os: alpine
       base_image_prefix: alpine
-      base_suffix: "" # Alpine images don’t use a suffix like "-slim"
+      base_suffix: "" # Alpine images don't use a suffix like "-slim"
       tag_prefix: alpine-
       product: ${{ matrix.product }}
       version: ${{ matrix.version }}
