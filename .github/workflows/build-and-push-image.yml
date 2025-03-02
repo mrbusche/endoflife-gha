@@ -120,8 +120,12 @@ jobs:
             -t mrbusche/${REPOSITORY_NAME}:"${TAG_MAJOR}" .
 
           echo "Tagging Docker images..."
-          docker tag mrbusche/${REPOSITORY_NAME}:"$TAG_MAJOR" mrbusche/${REPOSITORY_NAME}:"$TAG_MINOR"
-          docker tag mrbusche/${REPOSITORY_NAME}:"$TAG_MAJOR" mrbusche/${REPOSITORY_NAME}:"$TAG_PATCH"
+          if [ "${{ inputs.build_minor }}" = "true" ]; then
+            docker tag mrbusche/${REPOSITORY_NAME}:"$TAG_MAJOR" mrbusche/${REPOSITORY_NAME}:"$TAG_MINOR"
+          fi
+          if [ "${{ inputs.build_patch }}" = "true" ]; then
+            docker tag mrbusche/${REPOSITORY_NAME}:"$TAG_MAJOR" mrbusche/${REPOSITORY_NAME}:"$TAG_PATCH"
+          fi
 
           # Set outputs for use in later steps.
           echo "TAG_MAJOR=${TAG_MAJOR}" >> "$GITHUB_OUTPUT"
