@@ -7,10 +7,6 @@ on:
         description: "Operating system to use (debian or alpine)"
         required: true
         type: string
-      base_image_prefix:
-        description: 'Prefix for the base image (e.g. "debian" or "alpine")'
-        required: true
-        type: string
       base_suffix:
         description: 'Suffix for the base image (e.g. "-slim" for debian, "" for alpine)'
         required: true
@@ -69,9 +65,6 @@ jobs:
             echo "Fetching latest Alpine version..."
             OS_JSON=$(curl -s https://endoflife.date/api/alpine.json)
             OS_VERSION=$(echo "$OS_JSON" | jq -r '.[0].latest')
-            # if [[ ! $OS_VERSION == *"alpine"* ]]; then
-            #   OS_VERSION="alpine-$OS_VERSION"
-            # fi
           else
             echo "Unsupported OS: ${{ inputs.os }}"
             exit 1
@@ -99,11 +92,11 @@ jobs:
 
           echo "Building Docker image for $PRODUCT version $VERSION"
           echo "Source image: $SOURCE_IMAGE"
-          echo "Base image: ${{ inputs.base_image_prefix }}:${OS_VERSION}${{ inputs.base_suffix }}"
+          echo "Base image: ${{ inputs.os }}:${OS_VERSION}${{ inputs.base_suffix }}"
 
           docker build \
             --build-arg SOURCE_IMAGE="$SOURCE_IMAGE" \
-            --build-arg BASE_IMAGE="${{ inputs.base_image_prefix }}:${OS_VERSION}" \
+            --build-arg BASE_IMAGE="${{ inputs.os }}:${OS_VERSION}" \
             --build-arg BASE_SUFFIX="${{ inputs.base_suffix }}" \
             --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
             -t mrbusche/${REPOSITORY_NAME}:"${TAG_PATCH}" .

@@ -62,7 +62,6 @@ jobs:
     uses: ./.github/workflows/build-and-push-image.yml
     with:
       os: debian
-      base_image_prefix: debian
       base_suffix: -slim
       tag_prefix: "" # No extra tag string for Debian
       product: ${{ matrix.product }}
@@ -85,7 +84,6 @@ jobs:
     uses: ./.github/workflows/build-and-push-image.yml
     with:
       os: alpine
-      base_image_prefix: alpine
       base_suffix: "" # Alpine images don't use a suffix like "-slim"
       tag_prefix: alpine-
       product: ${{ matrix.product }}
