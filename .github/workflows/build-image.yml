@@ -26,6 +26,8 @@ jobs:
           echo "Fetching $PRODUCT versions from $API_URL..."
           curl -s "$API_URL" -o product.json
 
+          cat product.json
+
           current=$(date +%s)
           matrix_entries=()
 
