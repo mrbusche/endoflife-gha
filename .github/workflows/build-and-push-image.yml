@@ -90,7 +90,7 @@ jobs:
 
           TAG_MAJOR="${PRODUCT}-${major}-${OS_VERSION}"
           TAG_MINOR="${PRODUCT}-${major}.${minor}-${OS_VERSION}"
-          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-${OS_VERSION}"
+          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-${{ inputs.tag_prefix }}${OS_VERSION}"
 
           echo "Building Docker image for $PRODUCT version $VERSION"
           echo "Source image: $SOURCE_IMAGE"
