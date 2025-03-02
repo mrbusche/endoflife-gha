@@ -1,0 +1,123 @@
+name: Build and Push Docker Image
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: "Operating system to use (debian or alpine)"
+        required: true
+        type: string
+      base_image_prefix:
+        description: 'Prefix for the base image (e.g. "debian" or "alpine")'
+        required: true
+        type: string
+      base_suffix:
+        description: 'Suffix for the base image (e.g. "-slim" for debian, "" for alpine)'
+        required: true
+        type: string
+      tag_prefix:
+        description: 'Optional prefix to insert in image tags (e.g. "alpine-" for alpine images)'
+        required: true
+        type: string
+      product:
+        description: "Product name (e.g. eclipse-temurin)"
+        required: true
+        type: string
+      version:
+        description: "Product version (from the matrix)"
+        required: true
+        type: string
+      major:
+        description: "Major version number"
+        required: true
+        type: string
+      minor:
+        description: "Minor version number"
+        required: true
+        type: string
+      patch:
+        description: "Patch version number"
+        required: true
+        type: string
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    outputs:
+      os_version: ${{ steps.get_os_version.outputs.os_version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Fetch OS version
+        id: get_os_version
+        run: |
+          if [ "${{ inputs.os }}" = "debian" ]; then
+            echo "Fetching latest Debian codename..."
+            OS_JSON=$(curl -s https://endoflife.date/api/debian.json)
+            OS_VERSION=$(echo "$OS_JSON" | jq -r '.[0].codename' | tr '[:upper:]' '[:lower:]')
+          elif [ "${{ inputs.os }}" = "alpine" ]; then
+            echo "Fetching latest Alpine version..."
+            OS_JSON=$(curl -s https://endoflife.date/api/alpine.json)
+            OS_VERSION=$(echo "$OS_JSON" | jq -r '.[0].latest')
+          else
+            echo "Unsupported OS: ${{ inputs.os }}"
+            exit 1
+          fi
+          echo "OS version: $OS_VERSION"
+          echo "os_version=$OS_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build Docker image
+        id: build
+        run: |
+          PRODUCT="${{ inputs.product }}"
+          VERSION="${{ inputs.version }}"
+          major="${{ inputs.major }}"
+          minor="${{ inputs.minor }}"
+          patch="${{ inputs.patch }}"
+
+          DOCKER_VERSION=$(echo "$VERSION" | sed 's/+/_/')
+          SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
+          OS_VERSION="${{ steps.get_os_version.outputs.os_version }}"
+
+          echo "Building Docker image for $PRODUCT version $VERSION"
+          echo "Source image: $SOURCE_IMAGE"
+          echo "Base image: ${{ inputs.base_image_prefix }}:${OS_VERSION}${{ inputs.base_suffix }}"
+
+          docker build \
+            --build-arg SOURCE_IMAGE="$SOURCE_IMAGE" \
+            --build-arg BASE_IMAGE="${{ inputs.base_image_prefix }}:${OS_VERSION}" \
+            --build-arg BASE_SUFFIX="${{ inputs.base_suffix }}" \
+            --build-arg DOCKER_VERSION="$DOCKER_VERSION" \
+            -t mrbusche/runtime-tests:"${PRODUCT}-${major}.${minor}.${patch}-${{ inputs.tag_prefix }}${OS_VERSION}" .
+
+          # Construct tag variables.
+          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-${{ inputs.tag_prefix }}${OS_VERSION}"
+          TAG_MAJOR="${PRODUCT}-${major}-${{ inputs.tag_prefix }}${OS_VERSION}"
+          TAG_MINOR="${PRODUCT}-${major}.${minor}-${{ inputs.tag_prefix }}${OS_VERSION}"
+
+          # Set outputs for use in later steps.
+          echo "major=${major}" >> "$GITHUB_OUTPUT"
+          echo "minor=${minor}" >> "$GITHUB_OUTPUT"
+          echo "patch=${patch}" >> "$GITHUB_OUTPUT"
+          echo "TAG_PATCH=${TAG_PATCH}" >> "$GITHUB_OUTPUT"
+          echo "TAG_MAJOR=${TAG_MAJOR}" >> "$GITHUB_OUTPUT"
+          echo "TAG_MINOR=${TAG_MINOR}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker images
+        run: |
+          echo "Pushing Docker images for ${{ inputs.product }} on ${{ inputs.os }}..."
+          docker push mrbusche/runtime-tests:"${{ steps.build.outputs.TAG_PATCH }}"
+          docker push mrbusche/runtime-tests:"${{ steps.build.outputs.TAG_MAJOR }}"
+          docker push mrbusche/runtime-tests:"${{ steps.build.outputs.TAG_MINOR }}"
