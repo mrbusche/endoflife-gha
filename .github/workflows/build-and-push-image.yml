@@ -85,6 +85,10 @@ jobs:
           SOURCE_IMAGE="eclipse-temurin:${DOCKER_VERSION}-jre"
           OS_VERSION="${{ steps.get_os_version.outputs.os_version }}"
 
+          TAG_MAJOR="${PRODUCT}-${major}-${OS_VERSION}"
+          TAG_MINOR="${PRODUCT}-${major}.${minor}-${OS_VERSION}"
+          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-${OS_VERSION}"
+
           echo "Building Docker image for $PRODUCT version $VERSION"
           echo "Source image: $SOURCE_IMAGE"
           echo "Base image: ${{ inputs.base_image_prefix }}:${OS_VERSION}${{ inputs.base_suffix }}"
@@ -97,6 +101,9 @@ jobs:
             -t mrbusche/runtime-tests:"${PRODUCT}-${major}.${minor}.${patch}-${{ inputs.tag_prefix }}${OS_VERSION}" .
 
           echo "Output variables:"
+          echo "TAG_MAJOR=${TAG_MAJOR}"
+          echo "TAG_MINOR=${TAG_MINOR}"
+          echo "TAG_PATCH=${TAG_PATCH}"
           echo "major=${major}"
           echo "minor=${minor}"
           echo "patch=${patch}"
