@@ -131,9 +131,9 @@ jobs:
           patch="${{ matrix.patch }}"
           DEBIAN_CODENAME="${{ steps.debian.outputs.version }}"
 
-          TAG_MAJOR="${major}-${DEBIAN_CODENAME}"
-          TAG_MINOR="${major}.${minor}-${DEBIAN_CODENAME}"
-          TAG_PATCH="${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
+          TAG_MAJOR="${PRODUCT}-${major}-${DEBIAN_CODENAME}"
+          TAG_MINOR="${PRODUCT}-${major}.${minor}-${DEBIAN_CODENAME}"
+          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-${DEBIAN_CODENAME}"
 
           echo "Pushing Docker images for $PRODUCT on Debian:"
           echo "We would need to docker push these images"
@@ -175,9 +175,9 @@ jobs:
 
           ALPINE_VERSION="${{ steps.alpine.outputs.version }}"
 
-          TAG_MAJOR="${major}-alpine-${ALPINE_VERSION}"
-          TAG_MINOR="${major}.${minor}-alpine-${ALPINE_VERSION}"
-          TAG_PATCH="${major}.${minor}.${patch}-alpine-${ALPINE_VERSION}"
+          TAG_MAJOR="${PRODUCT}-${major}-alpine-${ALPINE_VERSION}"
+          TAG_MINOR="${PRODUCT}-${major}.${minor}-alpine-${ALPINE_VERSION}"
+          TAG_PATCH="${PRODUCT}-${major}.${minor}.${patch}-alpine-${ALPINE_VERSION}"
 
           echo "Building Docker image for $PRODUCT version $VERSION"
           echo "Source image: $SOURCE_IMAGE"
@@ -193,11 +193,11 @@ jobs:
           docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MAJOR"
           docker tag mrbusche/runtime-tests:"$TAG_PATCH" mrbusche/runtime-tests:"$TAG_MINOR"
 
-      # - name: Log in to Docker Hub (Alpine)
-      #   uses: docker/login-action@v2
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub (Alpine)
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Push Docker images (Alpine)
         run: |
@@ -213,6 +213,6 @@ jobs:
 
           echo "Pushing Docker images for $PRODUCT on Alpine:"
           echo "We would need to docker push these images"
-          # docker push mrbusche/runtime-tests:"$TAG_PATCH"
-          # docker push mrbusche/runtime-tests:"$TAG_MAJOR"
-          # docker push mrbusche/runtime-tests:"$TAG_MINOR"
+          docker push mrbusche/runtime-tests:"$TAG_PATCH"
+          docker push mrbusche/runtime-tests:"$TAG_MAJOR"
+          docker push mrbusche/runtime-tests:"$TAG_MINOR"
