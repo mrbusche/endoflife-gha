@@ -127,11 +127,7 @@ jobs:
       - name: Push Docker images
         run: |
           REPOSITORY_NAME="${{ inputs.repository_name }}"
-          echo "Pushing Docker images for ${{ inputs.product }} on ${{ inputs.os }}..."
-          echo "TAG_PATCH=${{ steps.build.outputs.TAG_PATCH }}"
-          echo "TAG_MAJOR=${{ steps.build.outputs.TAG_MAJOR }}"
-          echo "TAG_MINOR=${{ steps.build.outputs.TAG_MINOR }}"
-          echo "Pushing image: mrbusche/${REPOSITORY_NAME}:${{ steps.build.outputs.TAG_PATCH }}"
+          echo "Pushing Docker images for ${RESPOSITORY_NAME} on ${{ inputs.os }}..."
           docker push mrbusche/${REPOSITORY_NAME}:"${{ steps.build.outputs.TAG_PATCH }}"
           docker push mrbusche/${REPOSITORY_NAME}:"${{ steps.build.outputs.TAG_MAJOR }}"
           docker push mrbusche/${REPOSITORY_NAME}:"${{ steps.build.outputs.TAG_MINOR }}"
