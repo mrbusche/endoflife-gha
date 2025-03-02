@@ -35,10 +35,18 @@ jobs:
             eol=$(echo "$obj" | jq -r '.eol')
 
             if [ -n "$eol" ] && [ "$eol" != "null" ]; then
-              eol_epoch=$(date -d "$eol" +%s)
-              if [ "$eol_epoch" -lt "$current" ]; then
-                echo "Skipping version $latest (cycle $cycle) because its EOL ($eol) is in the past."
+              if [ "$eol" = "true" ]; then
+                echo "Skipping version $latest (cycle $cycle) because its EOL flag is set to true."
                 continue
+              elif [ "$eol" = "false" ]; then
+                # EOL is false; do nothing, proceed with this version.
+                :
+              else
+                eol_epoch=$(date -d "$eol" +%s)
+                if [ "$eol_epoch" -lt "$current" ]; then
+                  echo "Skipping version $latest (cycle $cycle) because its EOL ($eol) is in the past."
+                  continue
+                fi
               fi
             fi
 
